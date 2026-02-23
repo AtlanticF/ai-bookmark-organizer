@@ -1,27 +1,30 @@
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === "EXTRACT_CONTENT") {
-    const title = document.title;
+  if (message.type !== "EXTRACT_CONTENT") return false;
 
-    const metaDescription =
-      document.querySelector<HTMLMetaElement>('meta[name="description"]')
-        ?.content ?? "";
+  const title = document.title;
 
-    const ogDescription =
-      document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
-        ?.content ?? "";
+  const metaDescription =
+    document.querySelector<HTMLMetaElement>('meta[name="description"]')
+      ?.content ?? "";
 
-    const bodyText = (document.body.innerText ?? "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 500);
+  const ogDescription =
+    document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
+      ?.content ?? "";
 
-    sendResponse({
-      title,
-      description: metaDescription || ogDescription,
-      summary: bodyText,
-    });
-  }
+  const keywords =
+    document.querySelector<HTMLMetaElement>('meta[name="keywords"]')
+      ?.content ?? "";
 
+  const description = [metaDescription || ogDescription, keywords]
+    .filter(Boolean)
+    .join(" | ");
+
+  const bodyText = (document.body.innerText ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+
+  sendResponse({ title, description, summary: bodyText });
   return false;
 });
 
