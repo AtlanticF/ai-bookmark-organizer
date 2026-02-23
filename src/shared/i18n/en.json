@@ -1,0 +1,83 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "retry": "Retry",
+    "openSettings": "Open Settings",
+    "openInbox": "Open Inbox"
+  },
+  "popup": {
+    "status": {
+      "idle": "Idle",
+      "processing": "Processing {{current}}/{{total}}",
+      "configured": "API Connected",
+      "notConfigured": "API Not Configured"
+    },
+    "recentArchives": "Recent Archives",
+    "noRecentArchives": "No recent archives",
+    "archivedTo": "→ {{folder}}"
+  },
+  "options": {
+    "title": "Settings",
+    "apiBaseUrl": "API Base URL",
+    "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "sk-...",
+    "model": "Model",
+    "modelPlaceholder": "gpt-4o-mini",
+    "testConnection": "Test Connection",
+    "testSuccess": "Connection successful!",
+    "testFailed": "Connection failed: {{error}}",
+    "saved": "Settings saved",
+    "rerunArchive": "Re-run Full Archive"
+  },
+  "onboarding": {
+    "title": "Welcome to AI Bookmark Organizer",
+    "step1": {
+      "title": "Configure API",
+      "description": "Enter your OpenAI-compatible API credentials."
+    },
+    "step2": {
+      "title": "Test Connection",
+      "description": "Verifying your API connection...",
+      "success": "Connection verified!",
+      "failed": "Connection failed. Please check your settings."
+    },
+    "step3": {
+      "title": "Choose Mode",
+      "description": "How would you like to organize your bookmarks?",
+      "modeA": {
+        "title": "Keep Existing Structure",
+        "description": "Only new bookmarks will be automatically organized."
+      },
+      "modeB": {
+        "title": "Full Re-organization",
+        "description": "AI will redesign your entire bookmark structure."
+      }
+    },
+    "step4": {
+      "title": "Organize Bookmarks",
+      "backup": "Download Backup",
+      "backupDone": "Backup downloaded",
+      "generateStructure": "Generate Structure",
+      "generating": "AI is analyzing your bookmarks...",
+      "folderEditor": "Edit Folder Structure",
+      "confirmExecute": "Confirm & Organize",
+      "processing": "Processing {{current}}/{{total}}...",
+      "complete": "Organization complete!",
+      "succeeded": "{{count}} succeeded",
+      "failed": "{{count}} failed"
+    }
+  },
+  "notification": {
+    "archivedTo": "Archived to {{folder}}",
+    "archiveFailed": "Failed to archive {{title}}"
+  }
+}

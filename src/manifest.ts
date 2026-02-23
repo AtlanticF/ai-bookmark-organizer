@@ -1,0 +1,46 @@
+import { defineManifest } from "@crxjs/vite-plugin";
+
+export default defineManifest({
+  manifest_version: 3,
+  name: "__MSG_extName__",
+  description: "__MSG_extDescription__",
+  version: "0.1.0",
+  default_locale: "en",
+  permissions: [
+    "bookmarks",
+    "storage",
+    "notifications",
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "alarms",
+  ],
+  host_permissions: ["<all_urls>"],
+  background: {
+    service_worker: "src/background/index.ts",
+    type: "module",
+  },
+  action: {
+    default_popup: "src/popup/index.html",
+    default_icon: {
+      16: "icons/icon-16.png",
+      32: "icons/icon-32.png",
+      48: "icons/icon-48.png",
+      128: "icons/icon-128.png",
+    },
+  },
+  options_page: "src/options/index.html",
+  content_scripts: [
+    {
+      matches: ["<all_urls>"],
+      js: ["src/content/index.ts"],
+      run_at: "document_idle",
+    },
+  ],
+  icons: {
+    16: "icons/icon-16.png",
+    32: "icons/icon-32.png",
+    48: "icons/icon-48.png",
+    128: "icons/icon-128.png",
+  },
+});

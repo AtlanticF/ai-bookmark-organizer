@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "AI Bookmark Organizer",
+    "description": "Extension display name"
+  },
+  "extDescription": {
+    "message": "Automatically organize your bookmarks with AI into a clean, flat folder structure.",
+    "description": "Extension description"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "back": "上一步",
+    "next": "下一步",
+    "done": "完成",
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "retry": "重试",
+    "openSettings": "打开设置",
+    "openInbox": "打开收件箱"
+  },
+  "popup": {
+    "status": {
+      "idle": "空闲",
+      "processing": "处理中 {{current}}/{{total}}",
+      "configured": "API 已连接",
+      "notConfigured": "API 未配置"
+    },
+    "recentArchives": "最近归档",
+    "noRecentArchives": "暂无归档记录",
+    "archivedTo": "→ {{folder}}"
+  },
+  "options": {
+    "title": "设置",
+    "apiBaseUrl": "API 地址",
+    "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
+    "apiKey": "API 密钥",
+    "apiKeyPlaceholder": "sk-...",
+    "model": "模型",
+    "modelPlaceholder": "gpt-4o-mini",
+    "testConnection": "测试连接",
+    "testSuccess": "连接成功！",
+    "testFailed": "连接失败：{{error}}",
+    "saved": "设置已保存",
+    "rerunArchive": "重新全量归档"
+  },
+  "onboarding": {
+    "title": "欢迎使用 AI 书签整理器",
+    "step1": {
+      "title": "配置 API",
+      "description": "输入你的 OpenAI 兼容 API 凭证。"
+    },
+    "step2": {
+      "title": "测试连接",
+      "description": "正在验证 API 连接...",
+      "success": "连接验证通过！",
+      "failed": "连接失败，请检查设置。"
+    },
+    "step3": {
+      "title": "选择模式",
+      "description": "你希望如何整理书签？",
+      "modeA": {
+        "title": "保留现有结构",
+        "description": "仅对新增的书签进行自动归档。"
+      },
+      "modeB": {
+        "title": "全量重新归档",
+        "description": "AI 将重新设计你的整个书签结构。"
+      }
+    },
+    "step4": {
+      "title": "整理书签",
+      "backup": "下载备份",
+      "backupDone": "备份已下载",
+      "generateStructure": "生成结构",
+      "generating": "AI 正在分析你的书签...",
+      "folderEditor": "编辑文件夹结构",
+      "confirmExecute": "确认并整理",
+      "processing": "处理中 {{current}}/{{total}}...",
+      "complete": "整理完成！",
+      "succeeded": "{{count}} 个成功",
+      "failed": "{{count}} 个失败"
+    }
+  },
+  "notification": {
+    "archivedTo": "已归档到 {{folder}}",
+    "archiveFailed": "归档 {{title}} 失败"
+  }
+}

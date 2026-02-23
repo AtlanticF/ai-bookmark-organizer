@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "AI 书签整理器",
+    "description": "Extension display name"
+  },
+  "extDescription": {
+    "message": "利用 AI 自动将书签整理到简洁、扁平的文件夹结构中。",
+    "description": "Extension description"
+  }
+}
