@@ -4,6 +4,14 @@ import userEvent from "@testing-library/user-event";
 import "@/shared/i18n";
 import App from "../App";
 
+vi.mock("@/shared/lib/api-client", () => ({
+  testConnection: vi.fn(),
+}));
+
+import { testConnection } from "@/shared/lib/api-client";
+
+const mockTestConnection = vi.mocked(testConnection);
+
 let store: Record<string, unknown> = {};
 
 beforeEach(() => {
@@ -97,7 +105,12 @@ describe("Options Page", () => {
 
   it("test connection success shows success toast", async () => {
     const user = userEvent.setup();
-    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: true });
+    store["api_config"] = {
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-testkey123",
+      model: "gpt-4o-mini",
+    };
+    mockTestConnection.mockResolvedValue(true);
 
     render(<App />);
 
@@ -105,9 +118,6 @@ describe("Options Page", () => {
       expect(screen.getByLabelText(/API Base URL/i)).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText(/API Base URL/i), "https://api.openai.com/v1");
-    await user.type(screen.getByLabelText(/API Key/i), "sk-testkey123");
-    await user.type(screen.getByLabelText(/Model/i), "gpt-4o-mini");
     await user.click(screen.getByRole("button", { name: /Test Connection/i }));
 
     await waitFor(() => {
@@ -117,7 +127,12 @@ describe("Options Page", () => {
 
   it("test connection failure shows error toast", async () => {
     const user = userEvent.setup();
-    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: false });
+    store["api_config"] = {
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-testkey123",
+      model: "gpt-4o-mini",
+    };
+    mockTestConnection.mockResolvedValue(false);
 
     render(<App />);
 
@@ -125,9 +140,6 @@ describe("Options Page", () => {
       expect(screen.getByLabelText(/API Base URL/i)).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText(/API Base URL/i), "https://api.openai.com/v1");
-    await user.type(screen.getByLabelText(/API Key/i), "sk-testkey123");
-    await user.type(screen.getByLabelText(/Model/i), "gpt-4o-mini");
     await user.click(screen.getByRole("button", { name: /Test Connection/i }));
 
     await waitFor(() => {
