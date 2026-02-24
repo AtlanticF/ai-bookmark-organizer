@@ -40,6 +40,7 @@ const chromeMock = {
     get: vi.fn<(id: string) => Promise<chrome.bookmarks.BookmarkTreeNode[]>>().mockResolvedValue([]),
     create: vi.fn<(bookmark: chrome.bookmarks.BookmarkCreateArg) => Promise<chrome.bookmarks.BookmarkTreeNode>>().mockResolvedValue({ id: "new-id", title: "" } as chrome.bookmarks.BookmarkTreeNode),
     move: vi.fn<(id: string, destination: chrome.bookmarks.BookmarkDestinationArg) => Promise<chrome.bookmarks.BookmarkTreeNode>>().mockResolvedValue({} as chrome.bookmarks.BookmarkTreeNode),
+    update: vi.fn<(id: string, changes: chrome.bookmarks.BookmarkChangesArg) => Promise<chrome.bookmarks.BookmarkTreeNode>>().mockResolvedValue({} as chrome.bookmarks.BookmarkTreeNode),
     remove: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
     removeTree: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
     search: vi.fn<(query: string) => Promise<chrome.bookmarks.BookmarkTreeNode[]>>().mockResolvedValue([]),

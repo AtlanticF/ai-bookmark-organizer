@@ -4,13 +4,10 @@ import { useApiConfig } from "@/shared/hooks";
 import {
   flattenBookmarks,
   ensureFolderExists,
-  getFullTree,
   findEmptyFolders,
   removeFolders,
   reorderAllFolders,
   sortFoldersByPrefix,
-  findDuplicatePrefixFolders,
-  mergeFoldersInto,
   type FlatBookmark,
 } from "@/shared/lib/bookmark-tree";
 import {
@@ -19,11 +16,15 @@ import {
 } from "@/shared/lib/bookmark-export";
 import {
   generateFolderStructure,
-  batchClassifyBookmarks,
+  batchClassifyIntoProposed,
+  batchRenameBookmarks,
   pruneBookmarks,
-  decideFolderMerge,
+  assignPrefixes,
+  isInboxFolder,
+  isArchiveFolder,
 } from "@/background/ai-classifier";
 import { moveBookmark } from "@/background/bookmark-mover";
+import FolderTreeEditor from "@/shared/components/FolderTreeEditor";
 import type {
   ProposedFolder,
   BulkClassifyProgress,
@@ -33,12 +34,22 @@ import type {
 
 const PRUNE_BATCH_SIZE = 100;
 const CLASSIFY_BATCH_SIZE = 50;
+const RENAME_BATCH_SIZE = 50;
 const CONCURRENT_BATCHES = 3;
+
+interface RenamePreviewItem {
+  id: string;
+  url: string;
+  originalTitle: string;
+  newTitle: string;
+}
 
 type SubPhase =
   | "backup"
   | "pruning_analyze"
   | "pruning_review"
+  | "renaming"
+  | "rename_review"
   | "analyzing"
   | "editing"
   | "executing"
@@ -81,9 +92,12 @@ export default function StepBulkArchive({
   const [selectedForCleanup, setSelectedForCleanup] = useState<Set<string>>(
     new Set(),
   );
+  const [renamePreview, setRenamePreview] = useState<RenamePreviewItem[]>([]);
+  const [renameBatchProgress, setRenameBatchProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState("");
 
   const remainingBookmarksRef = useRef<FlatBookmark[]>([]);
+  const assignmentsRef = useRef<Map<string, string>>(new Map());
 
   async function handleBackup() {
     const html = await exportBookmarksAsHtml();
@@ -152,10 +166,94 @@ export default function StepBulkArchive({
       );
     }
 
-    await handleGenerate();
+    await handleStartRename();
   }
 
   async function handlePruneSkip() {
+    await handleStartRename();
+  }
+
+  async function handleStartRename() {
+    setError("");
+    setPhase("renaming");
+
+    try {
+      const rawTree = await chrome.bookmarks.getTree();
+      const bookmarks = flattenBookmarks(rawTree);
+      remainingBookmarksRef.current = bookmarks;
+
+      const mapped = bookmarks.map((b) => ({ title: b.title, url: b.url }));
+      const totalBatches = Math.ceil(mapped.length / RENAME_BATCH_SIZE);
+      setRenameBatchProgress({ current: 0, total: totalBatches });
+
+      const allResults: RenamePreviewItem[] = [];
+      let renameDone = 0;
+
+      const renameBatches: { bookmarks: FlatBookmark[]; mapped: { title: string; url: string }[] }[] = [];
+      for (let i = 0; i < bookmarks.length; i += RENAME_BATCH_SIZE) {
+        const batchBookmarks = bookmarks.slice(i, i + RENAME_BATCH_SIZE);
+        renameBatches.push({
+          bookmarks: batchBookmarks,
+          mapped: batchBookmarks.map((b) => ({ title: b.title, url: b.url })),
+        });
+      }
+
+      await runConcurrent(
+        renameBatches,
+        async (batch) => {
+          const results = await batchRenameBookmarks(batch.mapped, config, locale);
+          for (let j = 0; j < batch.bookmarks.length; j++) {
+            const bm = batch.bookmarks[j]!;
+            const result = results[j];
+            allResults.push({
+              id: bm.id,
+              url: bm.url,
+              originalTitle: bm.title,
+              newTitle: result?.newTitle ?? bm.title,
+            });
+          }
+          renameDone++;
+          setRenameBatchProgress({ current: renameDone, total: totalBatches });
+        },
+        CONCURRENT_BATCHES,
+      );
+
+      setRenamePreview(allResults);
+      setPhase("rename_review");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rename failed");
+      setPhase("backup");
+    }
+  }
+
+  function handleRenameEdit(index: number, newTitle: string) {
+    setRenamePreview((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index]!, newTitle };
+      return updated;
+    });
+  }
+
+  async function handleRenameConfirm() {
+    setError("");
+    try {
+      for (const item of renamePreview) {
+        if (item.newTitle !== item.originalTitle) {
+          try {
+            await chrome.bookmarks.update(item.id, { title: item.newTitle });
+          } catch {
+            // bookmark may have been deleted
+          }
+        }
+      }
+      await handleGenerate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rename apply failed");
+      setPhase("rename_review");
+    }
+  }
+
+  async function handleRenameSkip() {
     await handleGenerate();
   }
 
@@ -169,74 +267,11 @@ export default function StepBulkArchive({
 
       const mapped = bookmarks.map((b) => ({ title: b.title, url: b.url }));
       const result = await generateFolderStructure(mapped, config, locale);
-      setFolderStructure(result.folders);
-      setPhase("editing");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed");
-      setPhase("backup");
-    }
-  }
 
-  function handleFolderRename(index: number, newName: string) {
-    const updated = [...folderStructure];
-    updated[index] = { ...updated[index]!, name: newName };
-    setFolderStructure(updated);
-  }
-
-  function handleFolderDelete(index: number) {
-    const folder = folderStructure[index];
-    if (!folder) return;
-    if (folder.name.startsWith("00_") || folder.name.startsWith("99_")) return;
-    const updated = folderStructure.filter((_, i) => i !== index);
-    setFolderStructure(updated);
-  }
-
-  function handleAddCategory() {
-    const maxPrefix = Math.max(
-      ...folderStructure.map((f) => {
-        const match = f.name.match(/^(\d+)/);
-        return match?.[1] ? parseInt(match[1], 10) : 0;
-      }),
-      0,
-    );
-    const newPrefix = String(Math.min(maxPrefix + 1, 98)).padStart(2, "0");
-    setFolderStructure([
-      ...folderStructure,
-      {
-        name: `${newPrefix}_📁_New Category`,
-        description: "New category",
-        children: [],
-        estimated_count: 0,
-      },
-    ]);
-  }
-
-  async function handleExecute() {
-    setPhase("executing");
-    setError("");
-
-    try {
-      const sorted = sortFoldersByPrefix(folderStructure);
-      for (const folder of sorted) {
-        await ensureFolderExists(folder.name);
-        for (const child of folder.children) {
-          await ensureFolderExists(`${folder.name}/${child.name}`);
-        }
-      }
-
-      await reorderAllFolders();
+      const inboxFolder = result.folders.find((f) => isInboxFolder(f.name));
+      const inboxName = inboxFolder?.name ?? "📥_Inbox";
 
       setPhase("classifying");
-
-      const rawTree = await chrome.bookmarks.getTree();
-      const bookmarks = flattenBookmarks(rawTree);
-      const tree = await getFullTree();
-
-      const inboxFolder = folderStructure.find((f) =>
-        f.name.startsWith("00_"),
-      );
-      const inboxName = inboxFolder?.name ?? "00_📥_Inbox";
-
       const totalBatches = Math.ceil(bookmarks.length / CLASSIFY_BATCH_SIZE);
       const progress: BulkClassifyProgress = {
         total: totalBatches,
@@ -247,91 +282,246 @@ export default function StepBulkArchive({
       };
       setClassifyProgress({ ...progress });
 
-      let totalMoved = 0;
-      let totalFailed = 0;
+      const newAssignments = new Map<string, string>();
       let completedBatches = 0;
 
-      const batchItems: { batch: FlatBookmark[]; batchNum: number }[] = [];
+      const batchItems: FlatBookmark[][] = [];
       for (let i = 0; i < bookmarks.length; i += CLASSIFY_BATCH_SIZE) {
-        batchItems.push({
-          batch: bookmarks.slice(i, i + CLASSIFY_BATCH_SIZE),
-          batchNum: Math.floor(i / CLASSIFY_BATCH_SIZE) + 1,
-        });
+        batchItems.push(bookmarks.slice(i, i + CLASSIFY_BATCH_SIZE));
       }
 
-      async function processBatch(item: { batch: FlatBookmark[]; batchNum: number }) {
-        const mapped = item.batch.map((b) => ({ title: b.title, url: b.url }));
-        try {
-          const results = await batchClassifyBookmarks(mapped, tree, config, locale);
-          for (let j = 0; j < item.batch.length; j++) {
-            const bm = item.batch[j]!;
-            const classification = results[j];
-            const targetFolder =
-              classification && classification.confidence >= 0.5
-                ? classification.folder_path
-                : inboxName;
-            try {
-              await moveBookmark(bm.id, targetFolder, classification?.is_new_folder ?? false, bm.title, bm.url, "current");
-              totalMoved++;
-            } catch {
-              try {
-                await moveBookmark(bm.id, inboxName, false, bm.title, bm.url, "current");
-              } catch { /* already moved/deleted */ }
-              totalFailed++;
+      await runConcurrent(
+        batchItems,
+        async (batch) => {
+          const batchMapped = batch.map((b) => ({ title: b.title, url: b.url }));
+          try {
+            const results = await batchClassifyIntoProposed(
+              batchMapped,
+              result.folders,
+              config,
+              locale,
+            );
+            for (let j = 0; j < batch.length; j++) {
+              const bm = batch[j]!;
+              const classification = results[j];
+              const folderPath =
+                classification && classification.confidence >= 0.5
+                  ? classification.folder_path
+                  : inboxName;
+              newAssignments.set(bm.id, folderPath);
+            }
+          } catch {
+            for (const bm of batch) {
+              newAssignments.set(bm.id, inboxName);
             }
           }
-        } catch {
-          for (const bm of item.batch) {
-            try {
-              await moveBookmark(bm.id, inboxName, false, bm.title, bm.url, "current");
-            } catch { /* best effort */ }
-            totalFailed++;
+          completedBatches++;
+          progress.completed = completedBatches;
+          setClassifyProgress({ ...progress });
+        },
+        CONCURRENT_BATCHES,
+      );
+
+      assignmentsRef.current = newAssignments;
+
+      const counts = new Map<string, number>();
+      for (const folderPath of newAssignments.values()) {
+        counts.set(folderPath, (counts.get(folderPath) ?? 0) + 1);
+      }
+      const updatedFolders = result.folders.map((f) => ({
+        ...f,
+        estimated_count:
+          (counts.get(f.name) ?? 0) +
+          f.children.reduce(
+            (sum, c) => sum + (counts.get(`${f.name}/${c.name}`) ?? 0),
+            0,
+          ),
+      }));
+      setFolderStructure(updatedFolders);
+
+      setPhase("editing");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analysis failed");
+      setPhase("backup");
+    }
+  }
+
+  function handleFolderStructureChange(newFolders: ProposedFolder[]) {
+    const oldFolders = folderStructure;
+    const assignments = assignmentsRef.current;
+
+    for (let i = 0; i < Math.min(oldFolders.length, newFolders.length); i++) {
+      const oldFolder = oldFolders[i]!;
+      const newFolder = newFolders[i]!;
+
+      if (oldFolder.name !== newFolder.name) {
+        for (const [id, path] of assignments) {
+          if (path === oldFolder.name) {
+            assignments.set(id, newFolder.name);
+          } else if (path.startsWith(oldFolder.name + "/")) {
+            assignments.set(
+              id,
+              newFolder.name + path.slice(oldFolder.name.length),
+            );
           }
         }
-        completedBatches++;
-        progress.completed = completedBatches;
-        setClassifyProgress({ ...progress });
       }
 
-      await runConcurrent(batchItems, processBatch, CONCURRENT_BATCHES);
-
-      progress.completed = totalBatches;
-      progress.failed = totalFailed;
-      progress.status = "done";
-      setClassifyProgress({
-        ...progress,
-        total: bookmarks.length,
-        completed: totalMoved,
-        failed: totalFailed,
-      });
-
-      const duplicateGroups = await findDuplicatePrefixFolders();
-      if (duplicateGroups.length > 0) {
-        try {
-          const decisions = await decideFolderMerge(duplicateGroups, config, locale);
-          for (const decision of decisions) {
-            const group = duplicateGroups.find((g) => g.prefix === decision.prefix);
-            if (!group) continue;
-            const keepFolder = group.folders.find((f) => f.title === decision.keepTitle) ?? group.folders[0]!;
-            const removeIds = group.folders.filter((f) => f.id !== keepFolder.id).map((f) => f.id);
-            if (removeIds.length > 0) {
-              await mergeFoldersInto(keepFolder.id, removeIds);
+      const parentName = newFolder.name;
+      for (
+        let j = 0;
+        j < Math.min(oldFolder.children.length, newFolder.children.length);
+        j++
+      ) {
+        const oldChild = oldFolder.children[j]!;
+        const newChild = newFolder.children[j]!;
+        if (oldChild.name !== newChild.name) {
+          const oldPath = `${parentName}/${oldChild.name}`;
+          const newPath = `${parentName}/${newChild.name}`;
+          for (const [id, path] of assignments) {
+            if (path === oldPath) {
+              assignments.set(id, newPath);
             }
           }
-        } catch {
-          // dedup is best-effort
+        }
+      }
+    }
+
+    const inboxFolder = newFolders.find((f) => isInboxFolder(f.name));
+    const inboxPath = inboxFolder?.name ?? "📥_Inbox";
+    const validPaths = new Set<string>();
+    for (const f of newFolders) {
+      validPaths.add(f.name);
+      for (const c of f.children) {
+        validPaths.add(`${f.name}/${c.name}`);
+      }
+    }
+    for (const [id, path] of assignments) {
+      if (!validPaths.has(path)) {
+        assignments.set(id, inboxPath);
+      }
+    }
+
+    setFolderStructure(newFolders);
+  }
+
+  function handleAddCategory() {
+    const updated = [...folderStructure];
+    const archiveIndex = updated.findIndex((f) => isArchiveFolder(f.name));
+    const insertIndex = archiveIndex >= 0 ? archiveIndex : updated.length;
+    updated.splice(insertIndex, 0, {
+      name: "📁_New Category",
+      description: "New category",
+      children: [],
+      estimated_count: 0,
+    });
+    setFolderStructure(updated);
+  }
+
+  async function handleExecute() {
+    setPhase("executing");
+    setError("");
+
+    try {
+      const prefixed = assignPrefixes(folderStructure);
+      const sorted = sortFoldersByPrefix(prefixed);
+
+      const nameMapping = new Map<string, string>();
+      for (let i = 0; i < folderStructure.length; i++) {
+        const unprefixed = folderStructure[i]!;
+        const pf = prefixed[i]!;
+        nameMapping.set(unprefixed.name, pf.name);
+        for (let j = 0; j < unprefixed.children.length; j++) {
+          const uc = unprefixed.children[j]!;
+          const pc = pf.children[j]!;
+          nameMapping.set(
+            `${unprefixed.name}/${uc.name}`,
+            `${pf.name}/${pc.name}`,
+          );
+        }
+      }
+
+      for (const folder of sorted) {
+        await ensureFolderExists(folder.name);
+        for (const child of folder.children) {
+          await ensureFolderExists(`${folder.name}/${child.name}`);
         }
       }
 
       await reorderAllFolders();
 
-      const newFolderPrefixes = folderStructure
-        .map((f) => {
-          const match = f.name.match(/^(\d+)/);
-          return match?.[1] ?? "";
-        })
-        .filter(Boolean);
-      const empties = await findEmptyFolders(newFolderPrefixes);
+      const assignments = assignmentsRef.current;
+      const inboxFolder = prefixed.find((f) => isInboxFolder(f.name));
+      const inboxName = inboxFolder?.name ?? "00_📥_Inbox";
+
+      const total = assignments.size;
+      let totalMoved = 0;
+      let totalFailed = 0;
+
+      setClassifyProgress({
+        total,
+        completed: 0,
+        failed: 0,
+        currentTitle: "",
+        status: "moving",
+      });
+
+      for (const [bookmarkId, unprefixedPath] of assignments) {
+        const prefixedPath = nameMapping.get(unprefixedPath) ?? inboxName;
+        const bm = remainingBookmarksRef.current.find(
+          (b) => b.id === bookmarkId,
+        );
+        if (!bm) continue;
+
+        try {
+          await moveBookmark(
+            bookmarkId,
+            prefixedPath,
+            false,
+            bm.title,
+            bm.url,
+            "current",
+          );
+          totalMoved++;
+        } catch {
+          try {
+            await moveBookmark(
+              bookmarkId,
+              inboxName,
+              false,
+              bm.title,
+              bm.url,
+              "current",
+            );
+          } catch {
+            /* already moved/deleted */
+          }
+          totalFailed++;
+        }
+
+        if ((totalMoved + totalFailed) % 10 === 0) {
+          setClassifyProgress({
+            total,
+            completed: totalMoved,
+            failed: totalFailed,
+            currentTitle: "",
+            status: "moving",
+          });
+        }
+      }
+
+      setClassifyProgress({
+        total,
+        completed: totalMoved,
+        failed: totalFailed,
+        currentTitle: "",
+        status: "done",
+      });
+
+      await reorderAllFolders();
+
+      const newFolderNames = prefixed.map((f) => f.name);
+      const empties = await findEmptyFolders(newFolderNames);
       setEmptyFolders(empties);
       setSelectedForCleanup(new Set(empties.map((f) => f.id)));
 
@@ -538,6 +728,87 @@ export default function StepBulkArchive({
         </div>
       )}
 
+      {/* Phase: Renaming (AI Batch Rename) */}
+      {phase === "renaming" && (
+        <div className="py-8 text-center">
+          <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-sm text-muted-foreground mb-1">
+            {t("onboarding.step4.renaming")}
+          </p>
+          {renameBatchProgress.total > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t("onboarding.step4.renameProgress", {
+                current: renameBatchProgress.current,
+                total: renameBatchProgress.total,
+              })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Phase: Rename Review */}
+      {phase === "rename_review" && (
+        <div className="py-4">
+          <h3 className="text-sm font-medium mb-2">
+            {t("onboarding.step4.renameTitle")}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            {t("onboarding.step4.renameDescription", {
+              count: renamePreview.filter((r) => r.newTitle !== r.originalTitle).length,
+            })}
+          </p>
+          <ul className="space-y-1.5 mb-4 max-h-80 overflow-y-auto">
+            {renamePreview.map((item, idx) => (
+              <li
+                key={item.id}
+                className="flex flex-col gap-1 p-2 border border-border rounded-md"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {t("onboarding.step4.renameOriginal")}
+                  </span>
+                  <span className="text-xs truncate" title={item.originalTitle}>
+                    {item.originalTitle}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">→</span>
+                  <input
+                    type="text"
+                    value={item.newTitle}
+                    onChange={(e) => handleRenameEdit(idx, e.target.value)}
+                    className={`flex-1 px-2 py-1 text-xs border rounded bg-background ${
+                      item.newTitle !== item.originalTitle
+                        ? "border-primary/50"
+                        : "border-input"
+                    }`}
+                    data-testid={`rename-input-${idx}`}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleRenameSkip}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {t("onboarding.step4.renameSkip")}
+            </button>
+            <button
+              type="button"
+              onClick={handleRenameConfirm}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {t("onboarding.step4.renameConfirm", {
+                count: renamePreview.filter((r) => r.newTitle !== r.originalTitle).length,
+              })}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Phase: Analyzing (Generate Structure) */}
       {phase === "analyzing" && (
         <div className="py-8 text-center">
@@ -551,49 +822,28 @@ export default function StepBulkArchive({
       {/* Phase: Editing Folder Structure */}
       {phase === "editing" && (
         <div className="py-4">
-          <h3 className="text-sm font-medium mb-3">
+          <h3 className="text-sm font-medium mb-1">
             {t("onboarding.step4.folderEditor")}
           </h3>
-          <ul className="space-y-2 mb-4">
-            {folderStructure.map((folder, i) => {
-              const isProtected =
-                folder.name.startsWith("00_") ||
-                folder.name.startsWith("99_");
-              return (
-                <li
-                  key={`folder-${i}`}
-                  className="flex items-center gap-2 p-2 border border-border rounded-md"
-                >
-                  <input
-                    type="text"
-                    value={folder.name}
-                    onChange={(e) => handleFolderRename(i, e.target.value)}
-                    className="flex-1 px-2 py-1 text-sm border border-input rounded bg-background"
-                    data-testid={`folder-name-${i}`}
-                  />
-                  <span className="text-xs text-muted-foreground w-20 truncate">
-                    ~{folder.estimated_count}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleFolderDelete(i)}
-                    disabled={isProtected}
-                    className="text-xs text-destructive hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed px-2"
-                    data-testid={`folder-delete-${i}`}
-                  >
-                    ✕
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <p className="text-xs text-muted-foreground mb-3">
+            {t("onboarding.step4.folderEditorHint")}
+          </p>
+          <div className="mb-4 max-h-[60vh] overflow-y-auto">
+            <FolderTreeEditor
+              folders={folderStructure}
+              onChange={handleFolderStructureChange}
+              isProtected={(name) =>
+                isInboxFolder(name) || isArchiveFolder(name)
+              }
+            />
+          </div>
           <div className="flex gap-3 justify-between">
             <button
               type="button"
               onClick={handleAddCategory}
               className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
             >
-              + Add Category
+              + {t("onboarding.step4.addCategory")}
             </button>
             <button
               type="button"
@@ -606,17 +856,7 @@ export default function StepBulkArchive({
         </div>
       )}
 
-      {/* Phase: Executing (Creating Folders) */}
-      {phase === "executing" && (
-        <div className="py-8 text-center">
-          <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {t("onboarding.step4.processing", { current: 0, total: 0 })}
-          </p>
-        </div>
-      )}
-
-      {/* Phase: Classifying (Batch AI Classification) */}
+      {/* Phase: Classifying (during analysis, before editing) */}
       {phase === "classifying" && classifyProgress && (
         <div className="py-8 text-center">
           <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
@@ -633,10 +873,38 @@ export default function StepBulkArchive({
             <div
               className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{
-                width: `${((classifyProgress.completed + classifyProgress.failed) / Math.max(classifyProgress.total, 1)) * 100}%`,
+                width: `${(classifyProgress.completed / Math.max(classifyProgress.total, 1)) * 100}%`,
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Phase: Executing (Creating Folders & Moving Bookmarks) */}
+      {phase === "executing" && (
+        <div className="py-8 text-center">
+          <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-sm text-muted-foreground mb-1">
+            {t("onboarding.step4.movingBookmarks")}
+          </p>
+          {classifyProgress && classifyProgress.total > 0 && (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {t("onboarding.step4.moveProgress", {
+                  current: classifyProgress.completed + classifyProgress.failed,
+                  total: classifyProgress.total,
+                })}
+              </p>
+              <div className="mt-3 w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${((classifyProgress.completed + classifyProgress.failed) / Math.max(classifyProgress.total, 1)) * 100}%`,
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 

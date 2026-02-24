@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Mail, Github, ExternalLink } from "lucide-react";
 import { useApiConfig } from "@/shared/hooks";
 import { ApiConfigForm } from "@/shared/components/ApiConfigForm";
 import type { ApiConfig, QueueTask } from "@/shared/types";
@@ -7,9 +8,9 @@ import { testConnection } from "@/shared/lib/api-client";
 import { storageGet, storageSet, onStorageChanged } from "@/shared/lib/storage";
 import i18n from "@/shared/i18n";
 
-type NavTab = "llm" | "system" | "tasks";
+type NavTab = "llm" | "archive" | "system" | "tasks" | "about";
 
-const VALID_TABS: NavTab[] = ["llm", "system", "tasks"];
+const VALID_TABS: NavTab[] = ["llm", "archive", "system", "tasks", "about"];
 
 function getInitialTab(): NavTab {
   const params = new URLSearchParams(window.location.search);
@@ -23,8 +24,10 @@ export default function App() {
 
   const navItems: { key: NavTab; label: string }[] = [
     { key: "llm", label: t("options.nav.llm") },
+    { key: "archive", label: t("options.nav.archive") },
     { key: "system", label: t("options.nav.system") },
     { key: "tasks", label: t("options.nav.tasks") },
+    { key: "about", label: t("options.nav.about") },
   ];
 
   return (
@@ -53,8 +56,10 @@ export default function App() {
 
       <main className="flex-1 p-8 max-w-2xl">
         {activeTab === "llm" && <LlmConfigPanel />}
+        {activeTab === "archive" && <ArchivePanel />}
         {activeTab === "system" && <SystemConfigPanel />}
         {activeTab === "tasks" && <TaskQueuePanel />}
+        {activeTab === "about" && <AboutPanel />}
       </main>
     </div>
   );
@@ -103,12 +108,6 @@ function LlmConfigPanel() {
     }
   }
 
-  function handleRerunArchive() {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL("src/onboarding/index.html"),
-    });
-  }
-
   if (loading) {
     return <p className="text-muted-foreground">{t("common.loading")}</p>;
   }
@@ -137,16 +136,38 @@ function LlmConfigPanel() {
         onTest={handleTestConnection}
         testing={testing}
       />
+    </div>
+  );
+}
 
-      <hr className="my-8 border-border" />
+function ArchivePanel() {
+  const { t } = useTranslation();
 
-      <button
-        type="button"
-        onClick={handleRerunArchive}
-        className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-      >
-        {t("options.rerunArchive")}
-      </button>
+  function handleStartArchive() {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("src/onboarding/index.html"),
+    });
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-6">{t("options.nav.archive")}</h2>
+
+      <div className="rounded-lg border border-border p-6">
+        <h3 className="text-base font-semibold mb-2">
+          {t("options.archive.title")}
+        </h3>
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+          {t("options.archive.description")}
+        </p>
+        <button
+          type="button"
+          onClick={handleStartArchive}
+          className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          {t("options.archive.startButton")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -466,6 +487,73 @@ function StatCard({
     <div className="rounded-md border border-border p-3 text-center">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+const APP_VERSION = "0.1.0";
+
+function AboutPanel() {
+  const { t } = useTranslation();
+
+  const links = [
+    {
+      icon: <Mail className="w-4 h-4" />,
+      label: t("options.about.email"),
+      value: "atlanticfeng@icloud.com",
+      href: "mailto:atlanticfeng@icloud.com",
+    },
+    {
+      icon: <Github className="w-4 h-4" />,
+      label: "GitHub",
+      value: "AtlanticF",
+      href: "https://github.com/AtlanticF",
+    },
+    {
+      icon: <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>,
+      label: "X",
+      value: "@AICoderlaicai",
+      href: "https://x.com/AICoderlaicai",
+    },
+  ];
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-6">{t("options.nav.about")}</h2>
+
+      <div className="rounded-lg border border-border p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+            <span className="text-2xl">📑</span>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold">AI Bookmark Organizer</h3>
+            <p className="text-sm text-muted-foreground">
+              {t("options.about.version", { version: APP_VERSION })}
+            </p>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t("options.about.description")}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-border divide-y divide-border">
+        {links.map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors group"
+          >
+            <span className="text-muted-foreground">{link.icon}</span>
+            <span className="text-sm font-medium flex-1">{link.label}</span>
+            <span className="text-sm text-muted-foreground">{link.value}</span>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

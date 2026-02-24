@@ -22,7 +22,7 @@ const mockTree = [
         id: "1",
         title: "Bookmarks Bar",
         children: [
-          { id: "10", title: "00_📥_Inbox", children: [] },
+          { id: "10", title: "📥_Inbox", children: [] },
         ],
       },
       { id: "2", title: "Other Bookmarks", children: [] },
@@ -70,7 +70,7 @@ describe("ensureInboxExists", () => {
 
     vi.mocked(chrome.bookmarks.create).mockResolvedValue({
       id: "new-inbox",
-      title: "00_📥_Inbox",
+      title: "📥_Inbox",
     } as chrome.bookmarks.BookmarkTreeNode);
 
     const id = await ensureInboxExists();

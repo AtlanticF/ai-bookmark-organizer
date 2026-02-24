@@ -23,14 +23,22 @@
     },
     "recentArchives": "最近归档",
     "noRecentArchives": "暂无归档记录",
-    "archivedTo": "→ {{folder}}"
+    "archivedTo": "→ {{folder}}",
+    "clearHistory": "清除记录"
   },
   "options": {
     "title": "设置",
     "nav": {
       "llm": "LLM 配置",
+      "archive": "归档",
       "system": "系统设置",
-      "tasks": "任务队列"
+      "tasks": "任务队列",
+      "about": "关于"
+    },
+    "archive": {
+      "title": "全量重新归档",
+      "description": "启动 AI 归档向导，重新分析并整理你的所有书签。流程包括备份、清理、文件夹结构生成和智能分类。",
+      "startButton": "开始全量归档"
     },
     "apiBaseUrl": "API 地址",
     "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
@@ -42,11 +50,15 @@
     "testSuccess": "连接成功！",
     "testFailed": "连接失败：{{error}}",
     "saved": "设置已保存",
-    "rerunArchive": "重新全量归档",
     "system": {
       "fabLabel": "悬浮按钮",
       "fabDescription": "在网页右下角显示书签悬浮按钮",
       "languageLabel": "语言"
+    },
+    "about": {
+      "version": "版本 {{version}}",
+      "description": "一款基于 AI 的 Chrome 扩展，使用你自己的 LLM 服务将书签自动整理为语义化的目录结构。",
+      "email": "邮箱"
     }
   },
   "onboarding": {
@@ -89,13 +101,27 @@
       "pruneCategoryOutdated": "过时",
       "pruneCategoryLowValue": "低价值",
       "pruneCategoryBroken": "链接失效",
+      "renaming": "AI 正在重命名你的书签...",
+      "renameProgress": "正在重命名第 {{current}}/{{total}} 批...",
+      "renameTitle": "书签重命名预览",
+      "renameDescription": "AI 重命名了 {{count}} 个书签。你可以在应用前编辑任意标题：",
+      "renameOriginal": "原名：",
+      "renameConfirm": "应用重命名 ({{count}})",
+      "renameSkip": "跳过，保留原名",
       "generateStructure": "生成结构",
       "generating": "AI 正在分析你的书签...",
       "folderEditor": "编辑文件夹结构",
+      "folderEditorHint": "拖拽可调整分类顺序，点击可编辑名称和子目录。",
+      "dragHint": "拖拽排序",
+      "addCategory": "添加分类",
+      "addSubcategory": "添加子分类",
+      "newSubcategory": "新子分类",
       "confirmExecute": "确认并整理",
       "processing": "处理中 {{current}}/{{total}}...",
       "classifying": "AI 正在分类你的书签...",
       "classifyProgress": "正在分类第 {{current}}/{{total}} 批...",
+      "movingBookmarks": "正在创建文件夹并移动书签...",
+      "moveProgress": "正在移动 {{current}}/{{total}}...",
       "complete": "整理完成！",
       "succeeded": "{{count}} 个成功",
       "failed": "{{count}} 个失败",
@@ -109,7 +135,9 @@
   },
   "notification": {
     "archivedTo": "已归档到 {{folder}}",
-    "archiveFailed": "归档 {{title}} 失败"
+    "archiveFailed": "归档 {{title}} 失败",
+    "undo": "撤回",
+    "undone": "书签已恢复到原位置"
   },
   "sidepanel": {
     "title": "书签审核",

@@ -95,12 +95,12 @@ ai-bookmark-organizer/
 | File | Responsibility | Key APIs Used |
 |------|---------------|---------------|
 | `index.ts` | Entry point. Registers all event listeners, alarms, and context menus on install/startup | `chrome.runtime.onInstalled`, `chrome.alarms.create`, `chrome.contextMenus.create` |
-| `bookmark-listener.ts` | Listens for bookmark creation, moves new bookmarks to Inbox, enqueues classification task | `chrome.bookmarks.onCreated`, `chrome.bookmarks.move` |
+| `bookmark-listener.ts` | Debounces new bookmark events (5s), monitors `onMoved`/`onChanged`/`onRemoved`, enqueues classification task after stabilization | `chrome.bookmarks.onCreated`, `chrome.bookmarks.onMoved`, `chrome.bookmarks.onChanged`, `chrome.bookmarks.onRemoved` |
 | `task-queue.ts` | FIFO queue implementation. Persists to storage. Resumes on SW wake-up. Processes one task at a time | `chrome.storage.local`, `chrome.alarms.onAlarm` |
 | `ai-classifier.ts` | Builds prompts from bookmark data + folder tree. Calls LLM API. Parses and validates JSON responses | `api-client.ts` (internal) |
 | `content-extractor.ts` | Requests page content from Content Script. Handles timeout (5s). Falls back to URL+title | `chrome.tabs.sendMessage` |
 | `bookmark-mover.ts` | Moves bookmarks to target folder. Creates new folders if needed. Maintains folder tree cache | `chrome.bookmarks.move`, `chrome.bookmarks.create` |
-| `notification.ts` | Sends Chrome system notifications for archive results (success/failure) | `chrome.notifications.create` |
+| `notification.ts` | Sends Chrome notifications with Undo button for archive results; manages undo records | `chrome.notifications.create`, `chrome.notifications.onButtonClicked` |
 
 ### `src/content/` — Content Script
 

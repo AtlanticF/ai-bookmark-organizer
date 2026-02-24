@@ -43,6 +43,7 @@ A Chrome extension (Manifest V3) that leverages user-provided LLM services to au
 - Task queue must be persisted to `chrome.storage.local` to survive Service Worker restarts
 - Content Script (`src/content/`) communicates with background via `chrome.runtime.sendMessage`
 - All pages (popup, options, onboarding) are separate entry points with their own `index.html` + `main.tsx`
+- New bookmark events use a debounce strategy: `onCreated` does NOT immediately process; waits 5s for Chrome's native dialog to settle, monitors `onMoved`/`onChanged`/`onRemoved` to detect user interaction, then processes the bookmark in its final state
 
 ### AI Integration
 
@@ -50,6 +51,7 @@ A Chrome extension (Manifest V3) that leverages user-provided LLM services to au
 - Prompt templates live in `src/background/ai-classifier.ts`
 - LLM responses must be parsed as JSON with error handling and retry logic
 - Confidence threshold: if AI confidence < 0.5, route bookmark to Inbox
+- Archive notifications include an "Undo" button; undo records are stored in `chrome.storage.local` with a 15s TTL
 
 ### Bookmark Organization Best Practices (built into AI prompts)
 

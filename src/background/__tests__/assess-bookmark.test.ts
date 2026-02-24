@@ -13,8 +13,8 @@ const config: ApiConfig = {
 };
 
 const folderTree: FolderNode[] = [
-  { id: "10", title: "00_📥_Inbox" },
-  { id: "11", title: "10_📚_Library", children: [{ id: "12", title: "10.1_AI" }] },
+  { id: "10", title: "📥_Inbox" },
+  { id: "11", title: "📚_Library", children: [{ id: "12", title: "AI" }] },
 ];
 
 const existingBookmarks = [
@@ -34,7 +34,7 @@ describe("assessBookmark", () => {
         isWorthKeeping: true,
         reason: "Useful AI tool",
         confidence: 0.9,
-        suggestedFolder: "10_📚_Library/10.1_AI",
+        suggestedFolder: "📚_Library/AI",
         similarExisting: ["ChatGPT"],
       }),
     );
@@ -48,7 +48,7 @@ describe("assessBookmark", () => {
 
     expect(result.isWorthKeeping).toBe(true);
     expect(result.confidence).toBe(0.9);
-    expect(result.suggestedFolder).toBe("10_📚_Library/10.1_AI");
+    expect(result.suggestedFolder).toBe("📚_Library/AI");
     expect(result.similarExisting).toContain("ChatGPT");
   });
 
@@ -87,7 +87,7 @@ describe("assessBookmark", () => {
     );
 
     expect(result.isWorthKeeping).toBe(true);
-    expect(result.suggestedFolder).toBe("00_📥_Inbox");
+    expect(result.suggestedFolder).toBe("📥_Inbox");
   });
 
   it("defaults to keeping on API error", async () => {
@@ -112,7 +112,7 @@ describe("assessBookmark", () => {
         isWorthKeeping: true,
         reason: "OK",
         confidence: 0.8,
-        suggestedFolder: "00_📥_Inbox",
+        suggestedFolder: "📥_Inbox",
         similarExisting: [],
       }),
     );

@@ -45,8 +45,8 @@ The Service Worker is the central orchestrator. It has no DOM access and must pe
 | Responsibility | Details |
 |----------------|---------|
 | Listen for new bookmarks | `chrome.bookmarks.onCreated` event handler |
-| Move to Inbox | Immediately moves newly created bookmark to `00_📥_Inbox` folder |
-| Enqueue for classification | Pushes a task into the task queue |
+| Debounce native dialog | Waits 5s after creation; resets on `onMoved`/`onChanged`; cancels on `onRemoved` |
+| Enqueue for classification | After debounce, reads bookmark final state and pushes task into queue |
 | Ensure Inbox exists | Creates `00_📥_Inbox` on startup if it doesn't exist |
 
 #### Task Queue (`task-queue.ts`)
@@ -107,9 +107,9 @@ See [AI Prompts](ai-prompts.md) for prompt templates and classification strategy
 
 | Responsibility | Details |
 |----------------|---------|
-| Success notification | Chrome system notification: "🔖 Archived to [folder name]" |
+| Success notification | Chrome notification with "Undo" button; undo record persisted for 15s |
 | Error notification | "⚠️ Failed to archive [bookmark title]" |
-| Notification click | Opens the bookmark's destination folder in Chrome bookmark manager |
+| Undo handling | On button click, moves bookmark back to original folder and restores title |
 
 ### 2.2 Content Script (`src/content/index.ts`)
 
@@ -202,8 +202,22 @@ AI Classifier
                          ▼
                 ┌─────────────────┐
                 │ Bookmark Listener│
-                │ → Move to Inbox │
-                │ → Create task   │
+                │ → Record pending│
+                │ → Start 5s timer│
+                └────────┬────────┘
+                         │
+              ┌──────────┼──────────┐
+              │          │          │
+         onMoved    onChanged  onRemoved
+         (reset     (reset      (cancel)
+          2s)        2s)
+              │          │
+              └──────────┘
+                         │ timer expires
+                         ▼
+                ┌─────────────────┐
+                │ Get final state │
+                │ → Enqueue task  │
                 └────────┬────────┘
                          │ enqueue
                          ▼
@@ -234,6 +248,7 @@ AI Classifier
                 ┌─────────────────┐      ┌─────────────────┐
                 │  Notification   │─────▶│  Chrome System   │
                 │  Manager        │      │  Notification    │
+                │  (with Undo)    │      │  [Undo] button   │
                 └────────┬────────┘      └─────────────────┘
                          │
                          ▼
@@ -297,6 +312,8 @@ All data stored in `chrome.storage.local`:
 | `folder_tree_cache` | `FolderTreeCache` | Cached bookmark folder structure with timestamp |
 | `onboarding_completed` | `boolean` | Whether first-install onboarding is done |
 | `bulk_archive_progress` | `BulkProgress` | Progress state for bulk archive operation |
+| `pending_debounce` | `PendingDebounceBookmark[]` | Bookmarks in debounce phase (SW restart recovery) |
+| `undo_records` | `UndoRecord[]` | Recent archive undo data with 15s TTL |
 
 ```typescript
 interface ApiConfig {
@@ -330,6 +347,23 @@ interface BulkProgress {
   completed: number;
   failed: number;
   status: 'idle' | 'running' | 'done' | 'error';
+}
+
+interface PendingDebounceBookmark {
+  bookmarkId: string;
+  url: string;
+  title: string;
+  createdAt: number;
+}
+
+interface UndoRecord {
+  bookmarkId: string;
+  notificationId: string;
+  originalParentId: string;
+  targetParentId: string;
+  originalTitle: string;
+  renamedTitle?: string;
+  expiresAt: number;
 }
 ```
 

@@ -23,14 +23,22 @@
     },
     "recentArchives": "Recent Archives",
     "noRecentArchives": "No recent archives",
-    "archivedTo": "→ {{folder}}"
+    "archivedTo": "→ {{folder}}",
+    "clearHistory": "Clear"
   },
   "options": {
     "title": "Settings",
     "nav": {
       "llm": "LLM Config",
+      "archive": "Archive",
       "system": "System",
-      "tasks": "Task Queue"
+      "tasks": "Task Queue",
+      "about": "About"
+    },
+    "archive": {
+      "title": "Full Re-organization",
+      "description": "Launch the AI-powered archive wizard to re-analyze and reorganize all your bookmarks. This will guide you through backup, cleanup, folder structure generation, and classification.",
+      "startButton": "Start Full Archive"
     },
     "apiBaseUrl": "API Base URL",
     "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
@@ -42,11 +50,15 @@
     "testSuccess": "Connection successful!",
     "testFailed": "Connection failed: {{error}}",
     "saved": "Settings saved",
-    "rerunArchive": "Re-run Full Archive",
     "system": {
       "fabLabel": "Floating Button",
       "fabDescription": "Show the floating bookmark button on web pages",
       "languageLabel": "Language"
+    },
+    "about": {
+      "version": "Version {{version}}",
+      "description": "An AI-powered Chrome extension that automatically organizes your bookmarks into a semantically structured directory using your own LLM service.",
+      "email": "Email"
     }
   },
   "onboarding": {
@@ -89,13 +101,27 @@
       "pruneCategoryOutdated": "Outdated",
       "pruneCategoryLowValue": "Low Value",
       "pruneCategoryBroken": "Broken URL",
+      "renaming": "AI is renaming your bookmarks...",
+      "renameProgress": "Renaming batch {{current}}/{{total}}...",
+      "renameTitle": "Bookmark Rename Preview",
+      "renameDescription": "AI renamed {{count}} bookmarks. You can edit any title before applying:",
+      "renameOriginal": "Original:",
+      "renameConfirm": "Apply Renames ({{count}})",
+      "renameSkip": "Skip, keep original names",
       "generateStructure": "Generate Structure",
       "generating": "AI is analyzing your bookmarks...",
       "folderEditor": "Edit Folder Structure",
+      "folderEditorHint": "Drag to reorder categories. Edit names and subcategories as needed.",
+      "dragHint": "Drag to reorder",
+      "addCategory": "Add Category",
+      "addSubcategory": "Add Subcategory",
+      "newSubcategory": "New Subcategory",
       "confirmExecute": "Confirm & Organize",
       "processing": "Processing {{current}}/{{total}}...",
       "classifying": "AI is classifying your bookmarks...",
       "classifyProgress": "Classifying batch {{current}}/{{total}}...",
+      "movingBookmarks": "Creating folders and moving bookmarks...",
+      "moveProgress": "Moving {{current}}/{{total}}...",
       "complete": "Organization complete!",
       "succeeded": "{{count}} succeeded",
       "failed": "{{count}} failed",
@@ -109,7 +135,9 @@
   },
   "notification": {
     "archivedTo": "Archived to {{folder}}",
-    "archiveFailed": "Failed to archive {{title}}"
+    "archiveFailed": "Failed to archive {{title}}",
+    "undo": "Undo",
+    "undone": "Bookmark restored to original location"
   },
   "sidepanel": {
     "title": "Bookmark Review",

@@ -13,8 +13,8 @@ const mockTree = [
         id: "1",
         title: "Bookmarks Bar",
         children: [
-          { id: "10", title: "00_📥_Inbox", children: [] },
-          { id: "11", title: "01_🔥_Critical", children: [] },
+          { id: "10", title: "📥_Inbox", children: [] },
+          { id: "11", title: "🔥_Critical", children: [] },
         ],
       },
       { id: "2", title: "Other Bookmarks", children: [] },
@@ -56,15 +56,15 @@ describe("moveBookmark", () => {
   it("moves bookmark to existing folder", async () => {
     const result = await moveBookmark(
       "b1",
-      "01_🔥_Critical",
+      "🔥_Critical",
       false,
       "Test",
       "https://test.com",
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     expect(result.success).toBe(true);
-    expect(result.toFolder).toBe("01_🔥_Critical");
+    expect(result.toFolder).toBe("🔥_Critical");
     expect(chrome.bookmarks.move).toHaveBeenCalledWith("b1", {
       parentId: "11",
     });
@@ -73,11 +73,11 @@ describe("moveBookmark", () => {
   it("creates new folder when isNewFolder is true", async () => {
     const result = await moveBookmark(
       "b1",
-      "03_🎨_Design",
+      "🎨_Design",
       true,
       "Figma",
       "https://figma.com",
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     expect(result.success).toBe(true);
@@ -87,11 +87,11 @@ describe("moveBookmark", () => {
   it("updates archive history after move", async () => {
     await moveBookmark(
       "b1",
-      "01_🔥_Critical",
+      "🔥_Critical",
       false,
       "Test",
       "https://test.com",
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     const history = store["archive_history"] as unknown[];
@@ -99,8 +99,8 @@ describe("moveBookmark", () => {
     expect(history[0]).toEqual(
       expect.objectContaining({
         bookmarkId: "b1",
-        toFolder: "01_🔥_Critical",
-        fromFolder: "00_📥_Inbox",
+        toFolder: "🔥_Critical",
+        fromFolder: "📥_Inbox",
       }),
     );
   });
@@ -117,11 +117,11 @@ describe("moveBookmark", () => {
 
     await moveBookmark(
       "b-new",
-      "01_🔥_Critical",
+      "🔥_Critical",
       false,
       "New",
       "https://new.com",
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     const history = store["archive_history"] as unknown[];
@@ -136,11 +136,11 @@ describe("moveBookmark", () => {
 
     const result = await moveBookmark(
       "b1",
-      "01_🔥_Critical",
+      "🔥_Critical",
       false,
       "Test",
       "https://test.com",
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     expect(result.success).toBe(false);
@@ -156,7 +156,7 @@ describe("batchMoveBookmarks", () => {
         title: "Test 1",
         url: "https://t1.com",
         fromFolder: "Inbox",
-        targetFolderPath: "01_🔥_Critical",
+        targetFolderPath: "🔥_Critical",
         isNewFolder: false,
       },
       {
@@ -164,7 +164,7 @@ describe("batchMoveBookmarks", () => {
         title: "Test 2",
         url: "https://t2.com",
         fromFolder: "Inbox",
-        targetFolderPath: "01_🔥_Critical",
+        targetFolderPath: "🔥_Critical",
         isNewFolder: false,
       },
     ];
@@ -188,7 +188,7 @@ describe("batchMoveBookmarks", () => {
         title: "OK",
         url: "https://ok.com",
         fromFolder: "Inbox",
-        targetFolderPath: "01_🔥_Critical",
+        targetFolderPath: "🔥_Critical",
         isNewFolder: false,
       },
       {
@@ -196,7 +196,7 @@ describe("batchMoveBookmarks", () => {
         title: "Fail",
         url: "https://fail.com",
         fromFolder: "Inbox",
-        targetFolderPath: "01_🔥_Critical",
+        targetFolderPath: "🔥_Critical",
         isNewFolder: false,
       },
     ];
@@ -218,7 +218,7 @@ describe("batchMoveBookmarks", () => {
         title: "Fail",
         url: "https://fail.com",
         fromFolder: "Inbox",
-        targetFolderPath: "01_🔥_Critical",
+        targetFolderPath: "🔥_Critical",
         isNewFolder: false,
       },
     ]);

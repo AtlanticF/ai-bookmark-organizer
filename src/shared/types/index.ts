@@ -23,6 +23,7 @@ export interface QueueTask {
   renamedTitle?: string;
   error?: string;
   createdAt: number;
+  originalParentId?: string;
 }
 
 export interface ArchiveRecord {
@@ -104,6 +105,11 @@ export interface BatchClassificationItem {
   confidence: number;
 }
 
+export interface BatchRenameItem {
+  url: string;
+  newTitle: string;
+}
+
 export interface ProposedFolder {
   name: string;
   description: string;
@@ -156,6 +162,23 @@ export type ExtensionMessage =
   | { type: "REVIEW_DECISION"; payload: { bookmarkId: string; decision: "keep" | "discard" } }
   | { type: "OPEN_TASKS_PAGE" };
 
+export interface PendingDebounceBookmark {
+  bookmarkId: string;
+  url: string;
+  title: string;
+  createdAt: number;
+}
+
+export interface UndoRecord {
+  bookmarkId: string;
+  notificationId: string;
+  originalParentId: string;
+  targetParentId: string;
+  originalTitle: string;
+  renamedTitle?: string;
+  expiresAt: number;
+}
+
 export interface StorageSchema {
   api_config: ApiConfig;
   task_queue: QueueTask[];
@@ -166,4 +189,6 @@ export interface StorageSchema {
   pending_bookmark_review: PendingBookmarkReview | null;
   show_floating_button: boolean;
   language: string;
+  pending_debounce: PendingDebounceBookmark[];
+  undo_records: UndoRecord[];
 }

@@ -19,16 +19,16 @@ const mockTree = [
         children: [
           {
             id: "10",
-            title: "00_📥_Inbox",
+            title: "📥_Inbox",
             children: [],
           },
           {
             id: "20",
-            title: "10_📚_Library",
+            title: "📚_Library",
             children: [
               {
                 id: "21",
-                title: "10.1_AI",
+                title: "AI",
                 children: [
                   {
                     id: "100",
@@ -40,14 +40,14 @@ const mockTree = [
               },
               {
                 id: "22",
-                title: "10.2_Frontend",
+                title: "Frontend",
                 children: [],
               },
             ],
           },
           {
             id: "30",
-            title: "99_💤_Archive",
+            title: "💤_Archive",
             children: [],
           },
           {
@@ -115,29 +115,29 @@ describe("flattenBookmarks", () => {
 
 describe("findFolderByPath", () => {
   it("finds top-level folder", async () => {
-    const id = await findFolderByPath("00_📥_Inbox");
+    const id = await findFolderByPath("📥_Inbox");
     expect(id).toBe("10");
   });
 
   it("finds nested folder", async () => {
-    const id = await findFolderByPath("10_📚_Library/10.1_AI");
+    const id = await findFolderByPath("📚_Library/AI");
     expect(id).toBe("21");
   });
 
   it("returns null for non-existent folder", async () => {
-    const id = await findFolderByPath("03_🎨_Design");
+    const id = await findFolderByPath("🎨_Design");
     expect(id).toBeNull();
   });
 
   it("returns null for partially matching path", async () => {
-    const id = await findFolderByPath("10_📚_Library/10.9_Missing");
+    const id = await findFolderByPath("📚_Library/Missing");
     expect(id).toBeNull();
   });
 });
 
 describe("ensureFolderExists", () => {
   it("returns existing folder id without creating", async () => {
-    const id = await ensureFolderExists("00_📥_Inbox");
+    const id = await ensureFolderExists("📥_Inbox");
     expect(id).toBe("10");
     expect(chrome.bookmarks.create).not.toHaveBeenCalled();
   });
@@ -145,15 +145,15 @@ describe("ensureFolderExists", () => {
   it("creates folder when it does not exist", async () => {
     vi.mocked(chrome.bookmarks.create).mockResolvedValue({
       id: "new-1",
-      title: "03_🎨_Design",
+      title: "🎨_Design",
       parentId: "1",
     } as chrome.bookmarks.BookmarkTreeNode);
 
-    const id = await ensureFolderExists("03_🎨_Design");
+    const id = await ensureFolderExists("🎨_Design");
     expect(id).toBe("new-1");
     expect(chrome.bookmarks.create).toHaveBeenCalledWith({
       parentId: "1",
-      title: "03_🎨_Design",
+      title: "🎨_Design",
     });
   });
 
@@ -168,7 +168,7 @@ describe("ensureFolderExists", () => {
       } as chrome.bookmarks.BookmarkTreeNode;
     });
 
-    const id = await ensureFolderExists("03_🎨_Design/03.1_UI");
+    const id = await ensureFolderExists("🎨_Design/UI");
     expect(chrome.bookmarks.create).toHaveBeenCalledTimes(2);
     expect(id).toBe("new-2");
   });
@@ -177,37 +177,37 @@ describe("ensureFolderExists", () => {
 describe("buildTreeForPrompt", () => {
   it("formats flat folders", () => {
     const tree: FolderNode[] = [
-      { id: "1", title: "00_📥_Inbox" },
-      { id: "2", title: "01_🔥_Critical" },
+      { id: "1", title: "📥_Inbox" },
+      { id: "2", title: "🔥_Critical" },
     ];
     const result = buildTreeForPrompt(tree);
-    expect(result).toBe("00_📥_Inbox\n01_🔥_Critical");
+    expect(result).toBe("📥_Inbox\n🔥_Critical");
   });
 
   it("formats nested folders with indentation", () => {
     const tree: FolderNode[] = [
       {
         id: "1",
-        title: "10_📚_Library",
+        title: "📚_Library",
         children: [
-          { id: "2", title: "10.1_AI" },
-          { id: "3", title: "10.2_Frontend" },
+          { id: "2", title: "AI" },
+          { id: "3", title: "Frontend" },
         ],
       },
     ];
     const result = buildTreeForPrompt(tree);
     expect(result).toBe(
-      "10_📚_Library\n  10.1_AI\n  10.2_Frontend",
+      "📚_Library\n  AI\n  Frontend",
     );
   });
 
   it("skips nodes with empty title (no children)", () => {
     const tree: FolderNode[] = [
       { id: "0", title: "" },
-      { id: "1", title: "00_📥_Inbox" },
+      { id: "1", title: "📥_Inbox" },
     ];
     const result = buildTreeForPrompt(tree);
-    expect(result).toBe("00_📥_Inbox");
+    expect(result).toBe("📥_Inbox");
   });
 
   it("recurses into children of empty-title nodes", () => {
@@ -216,13 +216,13 @@ describe("buildTreeForPrompt", () => {
         id: "0",
         title: "",
         children: [
-          { id: "1", title: "00_📥_Inbox" },
-          { id: "2", title: "10_📚_Library" },
+          { id: "1", title: "📥_Inbox" },
+          { id: "2", title: "📚_Library" },
         ],
       },
     ];
     const result = buildTreeForPrompt(tree);
-    expect(result).toBe("00_📥_Inbox\n10_📚_Library");
+    expect(result).toBe("📥_Inbox\n📚_Library");
   });
 
   it("returns empty string for empty tree", () => {

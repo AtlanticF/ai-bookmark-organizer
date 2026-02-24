@@ -1,6 +1,6 @@
 import { storageGet, storageSet, getDecryptedApiConfig } from "@/shared/lib/storage";
 import { testConnection } from "@/shared/lib/api-client";
-import { initBookmarkListener, ensureInboxExists, markAsMoving, unmarkAsMoving } from "./bookmark-listener";
+import { initBookmarkListener, restorePendingDebounce, ensureInboxExists, markAsMoving, unmarkAsMoving } from "./bookmark-listener";
 import {
   dequeueTask,
   updateTask,
@@ -10,8 +10,8 @@ import {
 import { extractContent } from "./content-extractor";
 import { classifyBookmark, renameBookmark } from "./ai-classifier";
 import { moveBookmark } from "./bookmark-mover";
-import { notifyArchiveSuccess, notifyArchiveError } from "./notification";
-import { getFullTree } from "@/shared/lib/bookmark-tree";
+import { notifyArchiveSuccess, notifyArchiveError, findUndoRecord, clearExpiredUndoRecords } from "./notification";
+import { getFullTree, findFolderByPath } from "@/shared/lib/bookmark-tree";
 import { generateId } from "@/shared/lib/utils";
 
 const QUEUE_ALARM = "queue-check";
@@ -62,6 +62,7 @@ async function injectContentScriptIntoExistingTabs() {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === QUEUE_ALARM) {
     processQueue();
+    clearExpiredUndoRecords();
   }
 });
 
@@ -78,7 +79,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       id: generateId(),
       bookmarkId: bookmark.id,
       title: bookmark.title,
-      url: bookmark.url,
+      url: bookmark.url ?? "",
       status: "pending",
       createdAt: Date.now(),
     });
@@ -146,7 +147,43 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+chrome.notifications.onButtonClicked.addListener((notifId, buttonIndex) => {
+  if (buttonIndex === 0) {
+    handleUndoArchive(notifId);
+  }
+});
+
+async function handleUndoArchive(notificationId: string): Promise<void> {
+  try {
+    const record = await findUndoRecord(notificationId);
+    if (!record) return;
+
+    markAsMoving(record.bookmarkId);
+    await chrome.bookmarks.move(record.bookmarkId, {
+      parentId: record.originalParentId,
+    });
+    unmarkAsMoving(record.bookmarkId);
+
+    if (record.renamedTitle) {
+      await chrome.bookmarks.update(record.bookmarkId, {
+        title: record.originalTitle,
+      });
+    }
+
+    chrome.notifications.clear(notificationId);
+
+    const records = (await storageGet("undo_records")) ?? [];
+    await storageSet(
+      "undo_records",
+      records.filter((r) => r.notificationId !== notificationId),
+    );
+  } catch (error) {
+    console.error("[Undo] Failed to undo archive:", error);
+  }
+}
+
 initBookmarkListener();
+restorePendingDebounce();
 
 async function updateBadge() {
   try {
@@ -242,7 +279,7 @@ async function handleReviewDecision(
       classification.is_new_folder,
       bookmark.title,
       bookmark.url,
-      "00_📥_Inbox",
+      "📥_Inbox",
     );
 
     await storageSet("pending_bookmark_review", null);
@@ -297,13 +334,24 @@ async function processQueue(): Promise<void> {
 
       await updateTask(task.id, { status: "moving" });
 
+      let originalParentId = task.originalParentId;
+      if (!originalParentId) {
+        try {
+          const [current] = await chrome.bookmarks.get(task.bookmarkId);
+          originalParentId = current?.parentId;
+        } catch {
+          // Bookmark may have been removed
+        }
+      }
+
+      const fromFolder = originalParentId ? undefined : "📥_Inbox";
       const result = await moveBookmark(
         task.bookmarkId,
         classification.folder_path,
         classification.is_new_folder,
         task.title,
         task.url,
-        "00_📥_Inbox",
+        fromFolder ?? "📥_Inbox",
       );
 
       if (result.success) {
@@ -328,7 +376,17 @@ async function processQueue(): Promise<void> {
           targetFolder: result.toFolder,
           renamedTitle: newTitle !== task.title ? newTitle : undefined,
         });
-        notifyArchiveSuccess(newTitle, result.toFolder);
+
+        const targetFolderId = await findFolderByPath(classification.folder_path);
+        notifyArchiveSuccess({
+          bookmarkTitle: newTitle,
+          folderName: result.toFolder,
+          bookmarkId: task.bookmarkId,
+          originalParentId: originalParentId ?? "",
+          targetParentId: targetFolderId ?? "",
+          originalTitle: task.title,
+          renamedTitle: newTitle !== task.title ? newTitle : undefined,
+        });
       } else {
         await updateTask(task.id, {
           status: "error",

@@ -52,27 +52,31 @@ describe("truncateText", () => {
 });
 
 describe("isValidFolderPath", () => {
-  it("validates single folder", () => {
-    expect(isValidFolderPath("01_🔥_Critical")).toBe(true);
+  it("validates folder with emoji", () => {
+    expect(isValidFolderPath("🔥_Critical")).toBe(true);
   });
 
   it("validates nested path", () => {
-    expect(isValidFolderPath("10_📚_Library/10.1_AI")).toBe(true);
+    expect(isValidFolderPath("📚_Library/AI")).toBe(true);
   });
 
   it("validates inbox", () => {
-    expect(isValidFolderPath("00_📥_Inbox")).toBe(true);
+    expect(isValidFolderPath("📥_Inbox")).toBe(true);
   });
 
-  it("rejects paths without numeric prefix", () => {
-    expect(isValidFolderPath("Library")).toBe(false);
+  it("validates plain name", () => {
+    expect(isValidFolderPath("Library")).toBe(true);
   });
 
-  it("rejects paths with single digit prefix", () => {
-    expect(isValidFolderPath("1_Bad")).toBe(false);
+  it("rejects empty string", () => {
+    expect(isValidFolderPath("")).toBe(false);
+  });
+
+  it("rejects path with empty segment", () => {
+    expect(isValidFolderPath("Library/")).toBe(false);
   });
 
   it("validates archive", () => {
-    expect(isValidFolderPath("99_💤_Archive")).toBe(true);
+    expect(isValidFolderPath("💤_Archive")).toBe(true);
   });
 });

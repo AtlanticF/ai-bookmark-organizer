@@ -4,16 +4,18 @@ import { isValidFolderPath } from "@/shared/lib/utils";
 import type {
   ApiConfig,
   BatchClassificationItem,
+  BatchRenameItem,
   BookmarkAssessment,
   ChatMessage,
   ClassificationResponse,
   ContentExtractionResult,
   FolderNode,
   FolderStructureResponse,
+  ProposedFolder,
   PruneCandidate,
 } from "@/shared/types";
 
-const INBOX_PATH = "00_📥_Inbox";
+const INBOX_PATH = "📥_Inbox";
 
 const LOCALE_NAMES: Record<string, string> = {
   en: "English",
@@ -28,17 +30,17 @@ function langInstruction(locale: string): string {
 const CLASSIFY_SYSTEM_PROMPT = `You are a bookmark classification assistant. Your job is to determine the best folder for a given bookmark.
 
 RULES:
-1. PREFER EXISTING FOLDERS: Always try to match an existing folder first.
+1. PREFER EXISTING FOLDERS: Always try to match an existing folder first. Use the EXACT folder name as shown in the tree structure, including any numeric prefixes (e.g., "02_🤖_AI").
 2. NEW FOLDERS ALLOWED: If no existing folder fits well, you may suggest creating a new one.
-   - New folders MUST follow the naming convention: "{number}_{emoji}_{name}"
-   - Choose a prefix number that makes sense in the existing sequence.
-3. INBOX FALLBACK: If you cannot determine a good category with reasonable confidence, route to "00_📥_Inbox".
+   - New folders MUST follow the naming convention: "{emoji}_{name}" (e.g., "🛠️_DevTools")
+   - Do NOT include numeric prefixes for new folders.
+3. INBOX FALLBACK: If you cannot determine a good category with reasonable confidence, route to the Inbox folder (use the exact Inbox folder name from the tree).
 4. CONFIDENCE SCORING: Rate your confidence from 0.0 to 1.0.
    - 0.9-1.0: Perfect match to existing folder
    - 0.7-0.9: Good match, likely correct
    - 0.5-0.7: Uncertain, best guess
    - Below 0.5: Should go to Inbox
-5. SUBCATEGORY ROUTING: If a bookmark clearly belongs to a subcategory, route directly there (e.g., "10_📚_Library/10.1_AI").
+5. SUBCATEGORY ROUTING: If a bookmark clearly belongs to a subcategory, route directly there using EXACT names from the tree (e.g., "02_🤖_AI/02.1_Deep Learning").
 
 Respond ONLY with valid JSON. No explanations outside JSON.`;
 
@@ -46,20 +48,20 @@ const STRUCTURE_SYSTEM_PROMPT = `You are a bookmark directory architect. Your jo
 
 RULES:
 1. FLAT STRUCTURE: Maximum 2 levels of depth (category → subcategory). Never go deeper.
-2. PREFIX-CODED SORTING: Every folder name starts with a numeric prefix to control display order.
-   - Format: "{number}_{emoji}_{name}" (e.g., "01_🔥_Critical")
-   - Lower numbers = higher frequency / higher priority
-   - Top-level prefixes are two-digit: 00, 01, 02, ..., 99
-   - Subcategory prefixes: "{parent_number}.{sub_number}_{name}" (e.g., "10.1_AI", "10.2_Frontend")
+2. NAMING FORMAT: Each top-level category name starts with one emoji followed by underscore and name.
+   - Format: "{emoji}_{name}" (e.g., "🔥_Critical", "📚_Library")
+   - Do NOT include numeric prefixes. The system will add ordering prefixes automatically.
+   - Subcategory names: Just plain names, no prefix or emoji (e.g., "AI", "Frontend")
 3. MANDATORY FOLDERS:
-   - "00_📥_Inbox" must always exist (buffer for uncertain items)
-   - "99_💤_Archive" must always exist (cold storage)
+   - "📥_Inbox" must always exist (buffer for uncertain items)
+   - "💤_Archive" must always exist (cold storage)
 4. EMOJI LABELS: Each top-level category gets one intuitive emoji.
 5. SEMANTIC CLUSTERING: Group bookmarks by meaning, not by the user's original folder names.
 6. HARD LIMITS (MUST obey):
    - MAXIMUM 10 top-level categories (including Inbox and Archive). Merge similar themes if needed.
    - MAXIMUM 5 subcategories per parent. Merge related topics if a parent would exceed 5 children.
 7. SUBCATEGORIES: Only create subcategories when a category would contain 15+ bookmarks.
+8. NO DUPLICATES: Each folder name must be unique at its level. Never create two folders with the same name.
 
 Respond ONLY with valid JSON. No explanations outside JSON.`;
 
@@ -77,12 +79,13 @@ Respond ONLY with valid JSON. No explanations outside JSON.`;
 const BATCH_CLASSIFY_SYSTEM_PROMPT = `You are a bookmark batch classification assistant. Your job is to classify MULTIPLE bookmarks into the best folders simultaneously.
 
 RULES:
-1. PREFER EXISTING FOLDERS: Always try to match an existing folder first.
+1. PREFER EXISTING FOLDERS: Always try to match an existing folder first. Use the EXACT folder name as shown in the tree structure, including any numeric prefixes (e.g., "02_🤖_AI").
 2. NEW FOLDERS ALLOWED: If no existing folder fits well, you may suggest creating a new one.
-   - New folders MUST follow the naming convention: "{number}_{emoji}_{name}"
-3. INBOX FALLBACK: If you cannot determine a good category, route to "00_📥_Inbox".
+   - New folders MUST follow the naming convention: "{emoji}_{name}" (e.g., "🛠️_DevTools")
+   - Do NOT include numeric prefixes for new folders.
+3. INBOX FALLBACK: If you cannot determine a good category, route to the Inbox folder (use the exact Inbox folder name from the tree).
 4. CONFIDENCE SCORING: Rate your confidence from 0.0 to 1.0.
-5. SUBCATEGORY ROUTING: Route to subcategories when appropriate.
+5. SUBCATEGORY ROUTING: Route to subcategories when appropriate. Use "ParentFolder/SubFolder" with EXACT names from the tree (e.g., "02_🤖_AI/02.1_Deep Learning").
 
 Respond ONLY with valid JSON array. No explanations outside JSON.`;
 
@@ -115,6 +118,74 @@ PROCESSING RULES:
 - Keep concise: The entire name should ideally be under 60 characters.
 
 Respond ONLY with the renamed title. No explanations, no quotes, no extra formatting.`;
+
+const BATCH_RENAME_SYSTEM_PROMPT = `You are a bookmark naming expert. Transform raw page titles into standardized bookmark names for MULTIPLE bookmarks simultaneously.
+
+NAMING FORMULA:
+[Attribute] Core Keywords : Supplementary Note | Source #Tag
+
+FIELD RULES:
+- [Attribute]: REQUIRED. One of: [Todo], [Tool], [Ref], [Doc], [Tutorial], [Lib].
+- Core Keywords: REQUIRED. Extract the most essential subject, keep it concise.
+- Supplementary Note: OPTIONAL. Describe specific use case or what the page solves. Omit if title lacks enough info.
+- Source: REQUIRED. Site or platform short name, separated by |.
+- #Tag: OPTIONAL. 1-2 classification keywords at the end.
+
+PROCESSING RULES:
+- NO EMOJI: Plain text only.
+- Remove noise: Delete meaningless suffixes like "Home", "Login", "Official Website", "- Google Search", "(Powered by...)".
+- Differentiate: For well-known sites (GitHub, YouTube, Gmail), focus on the specific sub-page content, not the site name.
+- Keep concise: The entire name should ideally be under 60 characters.
+
+Respond ONLY with a valid JSON array. Each element must have "url" (same as input) and "newTitle". Preserve input order. No explanations outside JSON.`;
+
+export async function batchRenameBookmarks(
+  bookmarks: { title: string; url: string }[],
+  config: ApiConfig,
+  locale = "en",
+): Promise<BatchRenameItem[]> {
+  const bookmarksJson = JSON.stringify(
+    bookmarks.map((b) => ({ title: b.title, url: b.url })),
+  );
+
+  const userPrompt = `BOOKMARKS TO RENAME:
+${bookmarksJson}
+
+Rename each bookmark following the naming formula. Respond with a JSON array:
+[
+  { "url": "https://example.com", "newTitle": "[Ref] Example Guide : Quick Start | Example #dev" }
+]`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: BATCH_RENAME_SYSTEM_PROMPT + langInstruction(locale) },
+    { role: "user", content: userPrompt },
+  ];
+
+  try {
+    const response = await chatCompletion(messages, config, {
+      jsonMode: true,
+      timeoutMs: null,
+    });
+
+    const parsed = extractJsonArrayFromResponse(response);
+    if (!parsed) {
+      return bookmarks.map((b) => ({ url: b.url, newTitle: b.title }));
+    }
+
+    return bookmarks.map((bm, i) => {
+      const item = parsed[i] as Record<string, unknown> | undefined;
+      if (!item || typeof item.newTitle !== "string" || item.newTitle.length < 3) {
+        return { url: bm.url, newTitle: bm.title };
+      }
+      return {
+        url: bm.url,
+        newTitle: (item.newTitle as string).trim().replace(/^["']|["']$/g, ""),
+      };
+    });
+  } catch {
+    return bookmarks.map((b) => ({ url: b.url, newTitle: b.title }));
+  }
+}
 
 export async function renameBookmark(
   bookmark: { title: string; url: string },
@@ -159,9 +230,10 @@ export async function classifyBookmark(
 CURRENT FOLDER STRUCTURE:
 ${treeText}
 
-Classify this bookmark into the best folder. Respond with:
+Classify this bookmark into the best folder. Use the EXACT folder name from the tree above (including numeric prefixes if present).
+Respond with:
 {
-  "folder_path": "10_📚_Library/10.1_AI",
+  "folder_path": "02_📚_Library/02.1_AI",
   "is_new_folder": false,
   "confidence": 0.85,
   "reason": "Brief explanation of why this folder was chosen"
@@ -217,7 +289,7 @@ Classify each bookmark into the best folder. Respond with a JSON array, one entr
 [
   {
     "url": "https://example.com",
-    "folder_path": "10_📚_Library/10.1_AI",
+    "folder_path": "📚_Library/AI",
     "is_new_folder": false,
     "confidence": 0.85
   }
@@ -265,6 +337,109 @@ Classify each bookmark into the best folder. Respond with a JSON array, one entr
         url: bm.url,
         folder_path: (item.confidence as number) >= 0.5 ? folderPath : INBOX_PATH,
         is_new_folder: (item.is_new_folder as boolean) ?? false,
+        confidence: item.confidence as number,
+      };
+    });
+  } catch {
+    return bookmarks.map((b) => ({
+      url: b.url,
+      folder_path: INBOX_PATH,
+      is_new_folder: false,
+      confidence: 0,
+    }));
+  }
+}
+
+export function buildTreeTextFromProposed(folders: ProposedFolder[]): string {
+  const lines: string[] = [];
+  for (const folder of folders) {
+    lines.push(folder.name);
+    for (const child of folder.children) {
+      lines.push(`  ${child.name}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export async function batchClassifyIntoProposed(
+  bookmarks: { title: string; url: string }[],
+  proposedFolders: ProposedFolder[],
+  config: ApiConfig,
+  locale = "en",
+): Promise<BatchClassificationItem[]> {
+  const treeText = buildTreeTextFromProposed(proposedFolders);
+  const bookmarksJson = JSON.stringify(
+    bookmarks.map((b) => ({ title: b.title, url: b.url })),
+  );
+
+  const userPrompt = `BOOKMARKS TO CLASSIFY:
+${bookmarksJson}
+
+PROPOSED FOLDER STRUCTURE:
+${treeText}
+
+Classify each bookmark into the best folder from the structure above.
+Use ONLY folders listed above. For subcategories, use "ParentName/ChildName" format.
+Respond with a JSON array, one entry per bookmark (same order):
+[
+  {
+    "url": "https://example.com",
+    "folder_path": "🔧_DevTools/CLI Tools",
+    "is_new_folder": false,
+    "confidence": 0.85
+  }
+]`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: BATCH_CLASSIFY_SYSTEM_PROMPT + langInstruction(locale) },
+    { role: "user", content: userPrompt },
+  ];
+
+  try {
+    const response = await chatCompletion(messages, config, {
+      jsonMode: true,
+      timeoutMs: null,
+    });
+
+    const parsed = extractJsonArrayFromResponse(response);
+    if (!parsed) {
+      return bookmarks.map((b) => ({
+        url: b.url,
+        folder_path: INBOX_PATH,
+        is_new_folder: false,
+        confidence: 0,
+      }));
+    }
+
+    const validPaths = new Set<string>();
+    for (const f of proposedFolders) {
+      validPaths.add(f.name);
+      for (const c of f.children) {
+        validPaths.add(`${f.name}/${c.name}`);
+      }
+    }
+
+    return bookmarks.map((bm, i) => {
+      const item = parsed[i] as Record<string, unknown> | undefined;
+      if (
+        !item ||
+        typeof item.folder_path !== "string" ||
+        typeof item.confidence !== "number"
+      ) {
+        return {
+          url: bm.url,
+          folder_path: INBOX_PATH,
+          is_new_folder: false,
+          confidence: 0,
+        };
+      }
+      const folderPath = validPaths.has(item.folder_path as string)
+        ? (item.folder_path as string)
+        : INBOX_PATH;
+      return {
+        url: bm.url,
+        folder_path: (item.confidence as number) >= 0.5 ? folderPath : INBOX_PATH,
+        is_new_folder: false,
         confidence: item.confidence as number,
       };
     });
@@ -360,15 +535,25 @@ export async function generateFolderStructure(
 ${bookmarksJson}
 
 Based on these bookmarks, design an optimal folder structure.
+IMPORTANT: For categories with 15+ bookmarks, you MUST create subcategories (children) to further organize them. Each child has a "name" and "description".
 
 Respond with this JSON schema:
 {
   "folders": [
     {
-      "name": "00_📥_Inbox",
+      "name": "📥_Inbox",
       "description": "Buffer zone for uncertain classifications",
       "children": [],
       "estimated_count": 0
+    },
+    {
+      "name": "🔧_DevTools",
+      "description": "Development tools and utilities",
+      "children": [
+        { "name": "IDE & Editors", "description": "Code editors and IDE plugins" },
+        { "name": "CLI Tools", "description": "Command-line utilities" }
+      ],
+      "estimated_count": 25
     }
   ],
   "total_bookmarks": ${bookmarks.length},
@@ -392,16 +577,26 @@ Respond with this JSON schema:
 
   const parsed = raw as unknown as FolderStructureResponse;
 
-  const hasInbox = parsed.folders.some((f) =>
-    f.name.startsWith("00_"),
-  );
-  const hasArchive = parsed.folders.some((f) =>
-    f.name.startsWith("99_"),
-  );
+  parsed.folders = parsed.folders.map((f) => ({
+    ...f,
+    name: stripNumericPrefix(f.name) || "📁_Unnamed",
+    children: (Array.isArray(f.children) ? f.children : [])
+      .filter((c) => c && typeof c === "object")
+      .map((c) => ({
+        ...c,
+        name: stripNumericPrefix(c.name) || "Unnamed",
+        description: c.description ?? "",
+      })),
+  }));
+
+  parsed.folders = deduplicateFolders(parsed.folders);
+
+  const hasInbox = parsed.folders.some((f) => isInboxFolder(f.name));
+  const hasArchive = parsed.folders.some((f) => isArchiveFolder(f.name));
 
   if (!hasInbox) {
     parsed.folders.unshift({
-      name: INBOX_PATH,
+      name: "📥_Inbox",
       description: "Buffer zone for uncertain classifications",
       children: [],
       estimated_count: 0,
@@ -410,7 +605,7 @@ Respond with this JSON schema:
 
   if (!hasArchive) {
     parsed.folders.push({
-      name: "99_💤_Archive",
+      name: "💤_Archive",
       description: "Cold storage for completed projects",
       children: [],
       estimated_count: 0,
@@ -433,10 +628,10 @@ function enforceFolderLimits(response: FolderStructureResponse): void {
   }
 
   if (response.folders.length > MAX_TOP_LEVEL) {
-    const inbox = response.folders.find((f) => f.name.startsWith("00_"));
-    const archive = response.folders.find((f) => f.name.startsWith("99_"));
+    const inbox = response.folders.find((f) => isInboxFolder(f.name));
+    const archive = response.folders.find((f) => isArchiveFolder(f.name));
     const rest = response.folders.filter(
-      (f) => !f.name.startsWith("00_") && !f.name.startsWith("99_"),
+      (f) => !isInboxFolder(f.name) && !isArchiveFolder(f.name),
     );
 
     const kept = rest.slice(0, MAX_TOP_LEVEL - 2);
@@ -482,7 +677,7 @@ Assess this bookmark. Respond with:
   "isWorthKeeping": true,
   "reason": "Brief explanation",
   "confidence": 0.85,
-  "suggestedFolder": "10_📚_Library",
+  "suggestedFolder": "📚_Library",
   "similarExisting": ["Title of similar bookmark 1"]
 }`;
 
@@ -618,10 +813,18 @@ function isClassificationResponse(
 function isFolderStructureResponse(
   obj: Record<string, unknown>,
 ): boolean {
-  return (
-    Array.isArray(obj.folders) &&
-    obj.folders.length > 0 &&
-    typeof obj.total_bookmarks === "number"
+  if (
+    !Array.isArray(obj.folders) ||
+    obj.folders.length === 0 ||
+    typeof obj.total_bookmarks !== "number"
+  ) {
+    return false;
+  }
+  return obj.folders.every(
+    (f: unknown) =>
+      f !== null &&
+      typeof f === "object" &&
+      "name" in (f as Record<string, unknown>),
   );
 }
 
@@ -631,6 +834,101 @@ function defaultInboxResponse(reason: string): ClassificationResponse {
     is_new_folder: false,
     confidence: 0,
     reason,
+  };
+}
+
+export function stripNumericPrefix(name: string | undefined | null): string {
+  if (!name) return "";
+  return name.replace(/^\d+([._]\d+)*_/, "");
+}
+
+export function isInboxFolder(name: string): boolean {
+  return name.includes("📥") || name.toLowerCase().includes("inbox");
+}
+
+export function isArchiveFolder(name: string): boolean {
+  return name.includes("💤") || name.toLowerCase().includes("archive");
+}
+
+export function deduplicateFolders(
+  folders: ProposedFolder[],
+): ProposedFolder[] {
+  const seen = new Map<string, ProposedFolder>();
+  for (const folder of folders) {
+    const key = (folder.name ?? "").toLowerCase().trim();
+    const children = folder.children ?? [];
+    const existing = seen.get(key);
+    if (existing) {
+      existing.children = deduplicateChildren([
+        ...(existing.children ?? []),
+        ...children,
+      ]);
+      existing.estimated_count += folder.estimated_count ?? 0;
+      if (!existing.description && folder.description) {
+        existing.description = folder.description;
+      }
+    } else {
+      seen.set(key, {
+        ...folder,
+        children: deduplicateChildren([...children]),
+      });
+    }
+  }
+  return Array.from(seen.values());
+}
+
+function deduplicateChildren(
+  children: { name: string; description: string }[],
+): { name: string; description: string }[] {
+  const seen = new Map<string, { name: string; description: string }>();
+  for (const child of children) {
+    const key = child.name.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.set(key, child);
+    }
+  }
+  return Array.from(seen.values());
+}
+
+export function assignPrefixes(
+  folders: ProposedFolder[],
+): ProposedFolder[] {
+  const inbox = folders.find((f) => isInboxFolder(f.name));
+  const archive = folders.find((f) => isArchiveFolder(f.name));
+  const regular = folders.filter(
+    (f) => !isInboxFolder(f.name) && !isArchiveFolder(f.name),
+  );
+
+  const result: ProposedFolder[] = [];
+
+  if (inbox) {
+    result.push(prefixFolder(inbox, "00"));
+  }
+
+  regular.forEach((folder, i) => {
+    const prefix = String(i + 1).padStart(2, "0");
+    result.push(prefixFolder(folder, prefix));
+  });
+
+  if (archive) {
+    result.push(prefixFolder(archive, "99"));
+  }
+
+  return result;
+}
+
+function prefixFolder(
+  folder: ProposedFolder,
+  prefix: string,
+): ProposedFolder {
+  const stripped = stripNumericPrefix(folder.name) || "Unnamed";
+  return {
+    ...folder,
+    name: `${prefix}_${stripped}`,
+    children: (folder.children ?? []).map((child, ci) => ({
+      ...child,
+      name: `${prefix}.${ci + 1}_${stripNumericPrefix(child.name) || "Unnamed"}`,
+    })),
   };
 }
 

@@ -20,5 +20,5 @@ export function sleep(ms: number): Promise<void> {
 
 export function isValidFolderPath(path: string): boolean {
   const parts = path.split("/");
-  return parts.every((part) => /^\d{2}[._]/.test(part));
+  return parts.length > 0 && parts.every((part) => part.trim().length > 0);
 }

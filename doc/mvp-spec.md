@@ -54,7 +54,10 @@ Install extension
 ```
 User presses Ctrl+D to add bookmark
   → chrome.bookmarks.onCreated fires
-  → Bookmark auto-moved to Inbox folder
+  → Extension records bookmark, starts 5-second debounce
+  → If user changes folder/title in native dialog, timer resets (2s)
+  → If user removes bookmark, processing cancelled
+  → After debounce: read bookmark's final state
   → Enters processing queue
   → Content Script extracts current tab content
       (title + meta description + body summary)
@@ -65,7 +68,9 @@ User presses Ctrl+D to add bookmark
       - Target folder path (existing or suggest new)
   → Move bookmark to target folder
       (create folder if it doesn't exist, following prefix-code conventions)
-  → Chrome system notification: "🔖 Archived to [01_🔥_Critical]"
+  → AI renames bookmark title for clarity
+  → Chrome notification: "🔖 Archived to [folder]" with [Undo] button
+  → User can click Undo within 15s to revert move and title
   → Process next item in queue
 ```
 

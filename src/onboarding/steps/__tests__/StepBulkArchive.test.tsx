@@ -5,29 +5,41 @@ import "@/shared/i18n";
 import StepBulkArchive from "../StepBulkArchive";
 import type { ProposedFolder } from "@/shared/types";
 
+vi.mock("@/background/ai-classifier", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/background/ai-classifier")>();
+  return {
+    ...actual,
+    generateFolderStructure: vi.fn(),
+    batchClassifyBookmarks: vi.fn(),
+    batchRenameBookmarks: vi.fn(),
+    pruneBookmarks: vi.fn(),
+    decideFolderMerge: vi.fn(),
+  };
+});
+
 let store: Record<string, unknown> = {};
 
 const mockFolders: ProposedFolder[] = [
   {
-    name: "00_📥_Inbox",
+    name: "📥_Inbox",
     description: "Buffer",
     children: [],
     estimated_count: 0,
   },
   {
-    name: "01_🔥_Critical",
+    name: "🔥_Critical",
     description: "Daily tools",
     children: [],
     estimated_count: 5,
   },
   {
-    name: "10_📚_Library",
+    name: "📚_Library",
     description: "Knowledge",
-    children: [],
+    children: [{ name: "AI", description: "AI stuff" }],
     estimated_count: 10,
   },
   {
-    name: "99_💤_Archive",
+    name: "💤_Archive",
     description: "Cold storage",
     children: [],
     estimated_count: 0,
@@ -152,5 +164,148 @@ describe("StepBulkArchive", () => {
     const backButtons = screen.getAllByRole("button", { name: /^Back$/i });
     await user.click(backButtons[backButtons.length - 1]!);
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("enters renaming phase after prune with no candidates", async () => {
+    const user = userEvent.setup();
+    const { pruneBookmarks, batchRenameBookmarks } = await import("@/background/ai-classifier");
+    vi.mocked(pruneBookmarks).mockResolvedValue([]);
+    vi.mocked(batchRenameBookmarks).mockResolvedValue([
+      { url: "https://test.com", newTitle: "[Tool] Test | Test #dev" },
+    ]);
+
+    render(
+      <StepBulkArchive
+        folderStructure={[]}
+        setFolderStructure={vi.fn()}
+        onComplete={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText(/Analyze & Clean Up/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText(/Generate Structure/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bookmark Rename Preview/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows rename preview with editable inputs", async () => {
+    const user = userEvent.setup();
+    const { pruneBookmarks, batchRenameBookmarks } = await import("@/background/ai-classifier");
+    vi.mocked(pruneBookmarks).mockResolvedValue([]);
+    vi.mocked(batchRenameBookmarks).mockResolvedValue([
+      { url: "https://test.com", newTitle: "[Tool] Test Page | Test #dev" },
+    ]);
+
+    render(
+      <StepBulkArchive
+        folderStructure={[]}
+        setFolderStructure={vi.fn()}
+        onComplete={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText(/Analyze & Clean Up/i));
+    await waitFor(() => {
+      expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
+    });
+    await user.click(screen.getByText(/Generate Structure/i));
+
+    await waitFor(() => {
+      const input = screen.getByTestId("rename-input-0") as HTMLInputElement;
+      expect(input.value).toBe("[Tool] Test Page | Test #dev");
+    });
+  });
+
+  it("applies rename and proceeds to analyzing on confirm", async () => {
+    const user = userEvent.setup();
+    const { pruneBookmarks, batchRenameBookmarks, generateFolderStructure } = await import("@/background/ai-classifier");
+    vi.mocked(pruneBookmarks).mockResolvedValue([]);
+    vi.mocked(batchRenameBookmarks).mockResolvedValue([
+      { url: "https://test.com", newTitle: "[Tool] Test Renamed | Site" },
+    ]);
+    vi.mocked(generateFolderStructure).mockResolvedValue({
+      folders: mockFolders,
+      total_bookmarks: 1,
+      uncategorized_count: 0,
+    });
+
+    const setFolderStructure = vi.fn();
+
+    render(
+      <StepBulkArchive
+        folderStructure={[]}
+        setFolderStructure={setFolderStructure}
+        onComplete={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText(/Analyze & Clean Up/i));
+    await waitFor(() => {
+      expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
+    });
+    await user.click(screen.getByText(/Generate Structure/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bookmark Rename Preview/i)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText(/Apply Renames/i));
+
+    await waitFor(() => {
+      expect(chrome.bookmarks.update).toHaveBeenCalledWith("10", {
+        title: "[Tool] Test Renamed | Site",
+      });
+    });
+  });
+
+  it("skips rename and goes to analyzing", async () => {
+    const user = userEvent.setup();
+    const { pruneBookmarks, batchRenameBookmarks, generateFolderStructure } = await import("@/background/ai-classifier");
+    vi.mocked(pruneBookmarks).mockResolvedValue([]);
+    vi.mocked(batchRenameBookmarks).mockResolvedValue([
+      { url: "https://test.com", newTitle: "[Tool] Test | Test" },
+    ]);
+    vi.mocked(generateFolderStructure).mockResolvedValue({
+      folders: mockFolders,
+      total_bookmarks: 1,
+      uncategorized_count: 0,
+    });
+
+    const setFolderStructure = vi.fn();
+
+    render(
+      <StepBulkArchive
+        folderStructure={[]}
+        setFolderStructure={setFolderStructure}
+        onComplete={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText(/Analyze & Clean Up/i));
+    await waitFor(() => {
+      expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
+    });
+    await user.click(screen.getByText(/Generate Structure/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bookmark Rename Preview/i)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText(/Skip, keep original names/i));
+
+    await waitFor(() => {
+      expect(setFolderStructure).toHaveBeenCalled();
+    });
   });
 });

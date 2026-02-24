@@ -7,6 +7,29 @@ export interface FlatBookmark {
   parentId: string;
 }
 
+function stripNumericPrefix(name: string): string {
+  return name.replace(/^\d+([._]\d+)*_/, "");
+}
+
+function matchFolderTitle(
+  folderTitle: string,
+  searchName: string,
+): boolean {
+  if (folderTitle === searchName) return true;
+  return stripNumericPrefix(folderTitle) === searchName ||
+    stripNumericPrefix(folderTitle) === stripNumericPrefix(searchName);
+}
+
+function findMatchingFolder(
+  children: chrome.bookmarks.BookmarkTreeNode[],
+  name: string,
+): chrome.bookmarks.BookmarkTreeNode | undefined {
+  return (
+    children.find((n) => !n.url && n.title === name) ??
+    children.find((n) => !n.url && matchFolderTitle(n.title, name))
+  );
+}
+
 export async function getFullTree(): Promise<FolderNode[]> {
   const tree = await chrome.bookmarks.getTree();
   const userFolders = (tree[0]?.children ?? []).flatMap(
@@ -64,9 +87,7 @@ export async function findFolderByPath(
   let currentChildren = allRootChildren;
 
   for (const part of parts) {
-    const match = currentChildren.find(
-      (n) => !n.url && n.title === part,
-    );
+    const match = findMatchingFolder(currentChildren, part);
     if (!match) return null;
     if (part === parts[parts.length - 1]) return match.id;
     currentChildren = match.children ?? [];
@@ -89,9 +110,7 @@ export async function ensureFolderExists(
       : bookmarksBar?.children ?? [];
 
   for (const part of parts) {
-    const existing = currentChildren.find(
-      (n) => !n.url && n.title === part,
-    );
+    const existing = findMatchingFolder(currentChildren, part);
     if (existing) {
       currentParentId = existing.id;
       currentChildren = existing.children ?? [];
@@ -109,16 +128,17 @@ export async function ensureFolderExists(
 }
 
 export async function findEmptyFolders(
-  excludePrefixes: string[],
+  excludeNames: string[],
 ): Promise<EmptyFolder[]> {
   const tree = await chrome.bookmarks.getTree();
   const bookmarksBar = tree[0]?.children?.[0];
   if (!bookmarksBar?.children) return [];
 
   const empties: EmptyFolder[] = [];
+  const excludeSet = new Set(excludeNames);
 
   function isExcluded(title: string): boolean {
-    return excludePrefixes.some((p) => title.startsWith(p));
+    return excludeSet.has(title);
   }
 
   function walk(

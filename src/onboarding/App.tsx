@@ -44,6 +44,7 @@ export default function App() {
 
   async function handleComplete() {
     await storageSet("onboarding_completed", true);
+    window.close();
   }
 
   if (loading) {

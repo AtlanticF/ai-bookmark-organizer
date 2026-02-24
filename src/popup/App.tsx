@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Settings } from "lucide-react";
 import { useQueueStatus } from "@/shared/hooks";
-import { storageGet, onStorageChanged } from "@/shared/lib/storage";
+import { storageRemove, storageGet, onStorageChanged } from "@/shared/lib/storage";
 import type { ApiConfig, ArchiveRecord } from "@/shared/types";
 
 const MAX_RECENT = 5;
+
+function openSettings() {
+  chrome.runtime.openOptionsPage();
+}
 
 export default function App() {
   const { t } = useTranslation();
@@ -44,7 +49,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="w-80 p-4">
+      <div className="p-4">
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       </div>
     );
@@ -54,7 +59,7 @@ export default function App() {
 
   if (!isConfigured) {
     return (
-      <div className="w-80 p-4">
+      <div className="p-4">
         <h1 className="text-base font-semibold mb-3">AI Bookmark Organizer</h1>
         <div className="rounded-md border border-border p-3 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
@@ -65,7 +70,7 @@ export default function App() {
           </div>
           <button
             type="button"
-            onClick={() => chrome.runtime.openOptionsPage()}
+            onClick={openSettings}
             className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
           >
             {t("common.openSettings")}
@@ -79,8 +84,18 @@ export default function App() {
   const isProcessing = activeCount > 0;
 
   return (
-    <div className="w-80 p-4">
-      <h1 className="text-base font-semibold mb-3">AI Bookmark Organizer</h1>
+    <div className="p-4 flex flex-col" style={{ maxHeight: 400 }}>
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-base font-semibold">AI Bookmark Organizer</h1>
+        <button
+          type="button"
+          onClick={openSettings}
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title={t("common.openSettings")}
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      </div>
 
       <div className="flex items-center gap-2 mb-4">
         <span
@@ -98,16 +113,27 @@ export default function App() {
         </span>
       </div>
 
-      <div className="mb-4">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-          {t("popup.recentArchives")}
-        </h2>
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {t("popup.recentArchives")}
+          </h2>
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => storageRemove("archive_history")}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              {t("popup.clearHistory")}
+            </button>
+          )}
+        </div>
         {history.length === 0 ? (
           <p className="text-sm text-muted-foreground italic">
             {t("popup.noRecentArchives")}
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2 overflow-y-auto flex-1 min-h-0 pr-1">
             {history.map((record) => (
               <li
                 key={`${record.bookmarkId}-${record.timestamp}`}
@@ -126,25 +152,6 @@ export default function App() {
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="flex gap-2 pt-2 border-t border-border">
-        <button
-          type="button"
-          onClick={() => chrome.runtime.openOptionsPage()}
-          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
-        >
-          {t("common.openSettings")}
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            chrome.tabs.create({ url: "chrome://bookmarks" })
-          }
-          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
-        >
-          {t("common.openInbox")}
-        </button>
       </div>
     </div>
   );

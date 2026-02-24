@@ -52,8 +52,8 @@ function makeHistory(count: number): ArchiveRecord[] {
     bookmarkId: `b${i}`,
     title: `Page ${i}`,
     url: `https://example.com/${i}`,
-    fromFolder: "00_📥_Inbox",
-    toFolder: `01_🔥_Critical`,
+    fromFolder: "📥_Inbox",
+    toFolder: "🔥_Critical",
     timestamp: Date.now() - i * 1000,
   }));
 }

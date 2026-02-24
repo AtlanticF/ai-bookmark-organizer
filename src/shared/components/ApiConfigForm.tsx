@@ -13,7 +13,7 @@ const MODEL_PRESETS = [
   "gpt-4.1-mini",
   "gpt-4.1-nano",
   "gemini-2.5-flash",
-  "gemini-flash-lite-lates",
+  "gemini-flash-lite-latest",
 ] as const;
 
 export interface ApiConfigFormProps {

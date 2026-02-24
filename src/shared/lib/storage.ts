@@ -11,6 +11,8 @@ export const STORAGE_KEYS: Record<keyof StorageSchema, keyof StorageSchema> = {
   pending_bookmark_review: "pending_bookmark_review",
   show_floating_button: "show_floating_button",
   language: "language",
+  pending_debounce: "pending_debounce",
+  undo_records: "undo_records",
 } as const;
 
 export async function storageGet<K extends keyof StorageSchema>(

@@ -12,16 +12,16 @@ const mockTree = [
         children: [
           {
             id: "10",
-            title: "00_📥_Inbox",
+            title: "📥_Inbox",
             children: [],
           },
           {
             id: "20",
-            title: "10_📚_Library",
+            title: "📚_Library",
             children: [
               {
                 id: "21",
-                title: "10.1_AI",
+                title: "AI",
                 children: [
                   {
                     id: "100",
@@ -33,14 +33,14 @@ const mockTree = [
               },
               {
                 id: "22",
-                title: "10.2_Frontend",
+                title: "Frontend",
                 children: [],
               },
             ],
           },
           {
             id: "30",
-            title: "99_💤_Archive",
+            title: "💤_Archive",
             children: [],
           },
           {
@@ -65,21 +65,21 @@ beforeEach(() => {
 });
 
 describe("findEmptyFolders", () => {
-  it("finds empty folders excluding specified prefixes", async () => {
-    const result = await findEmptyFolders(["00_", "10_", "99_"]);
+  it("finds empty folders excluding specified names", async () => {
+    const result = await findEmptyFolders(["📥_Inbox", "📚_Library", "💤_Archive"]);
 
     const titles = result.map((f) => f.title);
     expect(titles).toContain("Old Folder");
     expect(titles).toContain("Another Empty");
-    expect(titles).not.toContain("00_📥_Inbox");
-    expect(titles).not.toContain("99_💤_Archive");
+    expect(titles).not.toContain("📥_Inbox");
+    expect(titles).not.toContain("💤_Archive");
   });
 
   it("finds nested empty folders", async () => {
-    const result = await findEmptyFolders(["00_", "99_"]);
+    const result = await findEmptyFolders(["📥_Inbox", "💤_Archive"]);
 
     const titles = result.map((f) => f.title);
-    expect(titles).toContain("10.2_Frontend");
+    expect(titles).toContain("Frontend");
     expect(titles).toContain("Old Folder");
     expect(titles).toContain("Another Empty");
   });
@@ -88,7 +88,7 @@ describe("findEmptyFolders", () => {
     const result = await findEmptyFolders([]);
 
     const titles = result.map((f) => f.title);
-    expect(titles).not.toContain("10.1_AI");
+    expect(titles).not.toContain("AI");
   });
 
   it("returns empty array when no empty folders exist", async () => {
@@ -121,8 +121,8 @@ describe("findEmptyFolders", () => {
   it("includes path in results", async () => {
     const result = await findEmptyFolders(["00_", "99_"]);
 
-    const frontend = result.find((f) => f.title === "10.2_Frontend");
-    expect(frontend?.path).toBe("10_📚_Library/10.2_Frontend");
+    const frontend = result.find((f) => f.title === "Frontend");
+    expect(frontend?.path).toBe("📚_Library/Frontend");
   });
 });
 
