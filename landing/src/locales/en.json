@@ -1,0 +1,35 @@
+{
+  "hero": {
+    "title": "AI Bookmark Organizer",
+    "tagline": "Auto-organize bookmarks with AI. Semantic classification, zero migration, privacy-first.",
+    "subtitle": "Use your own OpenAI-compatible API. No subscription, data stays local.",
+    "cta": "Add to Chrome"
+  },
+  "features": {
+    "title": "Why AI Bookmark Organizer",
+    "zeroMigration": {
+      "title": "Zero migration",
+      "description": "Works directly with Chrome native bookmarks. No export, no third-party sync—your existing bookmarks stay where they are."
+    },
+    "semantic": {
+      "title": "AI semantic classification",
+      "description": "Real content understanding, not keyword matching. Flat structure (category → subcategory), Inbox and Archive built in."
+    },
+    "privacy": {
+      "title": "Privacy-first, your API",
+      "description": "Data stays on your device. You bring your own OpenAI-compatible API—including self-hosted or local models. No subscription."
+    }
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "step1": "Install the extension from Chrome Web Store",
+    "step2": "Configure your API (base URL, key, model)",
+    "step3": "New bookmarks are queued automatically",
+    "step4": "AI classifies and moves them into the right folder"
+  },
+  "footer": {
+    "cta": "Add to Chrome",
+    "license": "MIT License"
+  },
+  "comingSoon": "Coming soon to Chrome Web Store"
+}

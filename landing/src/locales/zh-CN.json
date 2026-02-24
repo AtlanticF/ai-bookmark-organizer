@@ -1,0 +1,35 @@
+{
+  "hero": {
+    "title": "AI 书签整理助手",
+    "tagline": "用 AI 自动整理书签。语义分类、零迁移、隐私优先。",
+    "subtitle": "使用你自己的 OpenAI 兼容 API，无订阅，数据留在本地。",
+    "cta": "在 Chrome 网上应用店安装"
+  },
+  "features": {
+    "title": "为什么选 AI 书签整理助手",
+    "zeroMigration": {
+      "title": "零迁移",
+      "description": "直接使用 Chrome 原生书签，无需导出或第三方同步，现有书签原样保留。"
+    },
+    "semantic": {
+      "title": "AI 语义分类",
+      "description": "基于内容理解归类，而非关键词匹配。扁平结构（类别 → 子类），Inbox 与 Archive 内置。"
+    },
+    "privacy": {
+      "title": "隐私优先，自带 API",
+      "description": "数据留在本机。你可使用任意 OpenAI 兼容 API，包括自托管或本地模型，无需订阅。"
+    }
+  },
+  "howItWorks": {
+    "title": "使用方式",
+    "step1": "从 Chrome 网上应用店安装扩展",
+    "step2": "配置你的 API（地址、密钥、模型）",
+    "step3": "新书签自动进入队列",
+    "step4": "AI 分类并移动到对应文件夹"
+  },
+  "footer": {
+    "cta": "在 Chrome 网上应用店安装",
+    "license": "MIT 许可证"
+  },
+  "comingSoon": "即将上架 Chrome 网上应用店"
+}
