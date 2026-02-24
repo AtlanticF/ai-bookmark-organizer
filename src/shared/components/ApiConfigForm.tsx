@@ -2,11 +2,25 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ApiConfig } from "@/shared/types";
 
+const API_PRESETS = [
+  { label: "OpenAI", url: "https://api.openai.com/v1" },
+  { label: "Gemini", url: "https://generativelanguage.googleapis.com/v1beta/openai" },
+] as const;
+
+const MODEL_PRESETS = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+  "gemini-2.5-flash",
+  "gemini-flash-lite-lates",
+] as const;
+
 export interface ApiConfigFormProps {
   initialConfig: ApiConfig;
   onSave: (config: ApiConfig) => Promise<void>;
   showTestButton?: boolean;
-  onTest?: () => Promise<void>;
+  onTest?: (config: ApiConfig) => Promise<void>;
   testing?: boolean;
   submitLabel?: string;
 }
@@ -79,6 +93,22 @@ export function ApiConfigForm({
           placeholder={t("options.apiBaseUrlPlaceholder")}
           className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {API_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setBaseUrl(preset.url)}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                baseUrl === preset.url
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         {errors.baseUrl && (
           <p className="text-destructive text-xs mt-1">{errors.baseUrl}</p>
         )}
@@ -122,6 +152,22 @@ export function ApiConfigForm({
           placeholder={t("options.modelPlaceholder")}
           className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {MODEL_PRESETS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setModel(m)}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                model === m
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
         {errors.model && (
           <p className="text-destructive text-xs mt-1">{errors.model}</p>
         )}
@@ -138,7 +184,10 @@ export function ApiConfigForm({
         {showTestButton && onTest && (
           <button
             type="button"
-            onClick={onTest}
+            onClick={() => {
+              const config = validate();
+              if (config) onTest(config);
+            }}
             disabled={testing}
             className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >

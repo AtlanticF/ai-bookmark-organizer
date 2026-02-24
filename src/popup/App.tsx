@@ -107,18 +107,21 @@ export default function App() {
             {t("popup.noRecentArchives")}
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {history.map((record) => (
               <li
                 key={`${record.bookmarkId}-${record.timestamp}`}
-                className="text-sm truncate"
-                title={record.title}
+                className="rounded-md border border-border px-2.5 py-2"
               >
-                <span className="text-foreground">{record.title}</span>
-                <span className="text-muted-foreground">
-                  {" "}
+                <p className="text-sm font-medium text-foreground break-words">
+                  {record.title}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5 break-all">
+                  {record.url}
+                </p>
+                <p className="text-xs text-primary mt-1">
                   {t("popup.archivedTo", { folder: record.toFolder })}
-                </span>
+                </p>
               </li>
             ))}
           </ul>

@@ -21,11 +21,10 @@ export default function App() {
     showToast("success", t("options.saved"));
   }
 
-  async function handleTestConnection() {
-    if (!config) return;
+  async function handleTestConnection(formConfig: ApiConfig) {
     setTesting(true);
     try {
-      const success = await testConnection(config);
+      const success = await testConnection(formConfig);
       if (success) {
         showToast("success", t("options.testSuccess"));
       } else {

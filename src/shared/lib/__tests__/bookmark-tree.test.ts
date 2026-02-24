@@ -201,13 +201,28 @@ describe("buildTreeForPrompt", () => {
     );
   });
 
-  it("skips nodes with empty title", () => {
+  it("skips nodes with empty title (no children)", () => {
     const tree: FolderNode[] = [
       { id: "0", title: "" },
       { id: "1", title: "00_📥_Inbox" },
     ];
     const result = buildTreeForPrompt(tree);
     expect(result).toBe("00_📥_Inbox");
+  });
+
+  it("recurses into children of empty-title nodes", () => {
+    const tree: FolderNode[] = [
+      {
+        id: "0",
+        title: "",
+        children: [
+          { id: "1", title: "00_📥_Inbox" },
+          { id: "2", title: "10_📚_Library" },
+        ],
+      },
+    ];
+    const result = buildTreeForPrompt(tree);
+    expect(result).toBe("00_📥_Inbox\n10_📚_Library");
   });
 
   it("returns empty string for empty tree", () => {

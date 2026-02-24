@@ -18,6 +18,8 @@ export default defineConfig({
         popup: resolve(__dirname, "src/popup/index.html"),
         options: resolve(__dirname, "src/options/index.html"),
         onboarding: resolve(__dirname, "src/onboarding/index.html"),
+        sidepanel: resolve(__dirname, "src/sidepanel/index.html"),
+        tasks: resolve(__dirname, "src/tasks/index.html"),
       },
     },
   },

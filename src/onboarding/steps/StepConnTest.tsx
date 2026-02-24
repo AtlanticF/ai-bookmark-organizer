@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { storageGet } from "@/shared/lib/storage";
+import { getDecryptedApiConfig } from "@/shared/lib/storage";
 import { testConnection } from "@/shared/lib/api-client";
 
 interface Props {
@@ -17,7 +17,7 @@ export default function StepConnTest({ onSuccess, onBack }: Props) {
     setStatus("testing");
     setErrorMsg("");
     try {
-      const config = await storageGet("api_config");
+      const config = await getDecryptedApiConfig();
       if (!config) {
         setStatus("error");
         setErrorMsg("API not configured");

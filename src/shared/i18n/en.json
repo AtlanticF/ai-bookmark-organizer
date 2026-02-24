@@ -11,7 +11,8 @@
     "success": "Success",
     "retry": "Retry",
     "openSettings": "Open Settings",
-    "openInbox": "Open Inbox"
+    "openInbox": "Open Inbox",
+    "skip": "Skip"
   },
   "popup": {
     "status": {
@@ -66,18 +67,75 @@
       "title": "Organize Bookmarks",
       "backup": "Download Backup",
       "backupDone": "Backup downloaded",
+      "startPrune": "Analyze & Clean Up",
+      "pruneAnalyzing": "AI is analyzing your bookmarks for duplicates and low-value items...",
+      "pruneProgress": "Analyzing batch {{current}}/{{total}}...",
+      "pruneTitle": "Bookmark Cleanup Suggestions",
+      "pruneDescription": "AI found {{count}} bookmarks that may be unnecessary. Select the ones you want to remove:",
+      "pruneEmpty": "All your bookmarks look good! No cleanup needed.",
+      "pruneConfirm": "Delete Selected ({{count}})",
+      "pruneSkip": "Skip, keep all",
+      "pruneCategoryDuplicate": "Duplicate",
+      "pruneCategoryOutdated": "Outdated",
+      "pruneCategoryLowValue": "Low Value",
+      "pruneCategoryBroken": "Broken URL",
       "generateStructure": "Generate Structure",
       "generating": "AI is analyzing your bookmarks...",
       "folderEditor": "Edit Folder Structure",
       "confirmExecute": "Confirm & Organize",
       "processing": "Processing {{current}}/{{total}}...",
+      "classifying": "AI is classifying your bookmarks...",
+      "classifyProgress": "Classifying batch {{current}}/{{total}}...",
       "complete": "Organization complete!",
       "succeeded": "{{count}} succeeded",
-      "failed": "{{count}} failed"
+      "failed": "{{count}} failed",
+      "cleanupTitle": "Clean up old folders",
+      "cleanupDescription": "The following empty folders can be removed:",
+      "cleanupConfirm": "Delete Selected Folders",
+      "cleanupSkip": "Skip, keep old folders",
+      "cleanupEmpty": "No empty folders found.",
+      "cleanupDone": "Cleanup complete!"
     }
   },
   "notification": {
     "archivedTo": "Archived to {{folder}}",
     "archiveFailed": "Failed to archive {{title}}"
+  },
+  "sidepanel": {
+    "title": "Bookmark Review",
+    "analyzing": "Analyzing bookmark...",
+    "duplicateFound": "Duplicate detected",
+    "duplicateDescription": "You already have this URL bookmarked:",
+    "noDuplicate": "No duplicates found",
+    "aiAssessment": "AI Assessment",
+    "worthKeeping": "Worth keeping",
+    "notWorthKeeping": "May not be needed",
+    "reason": "Reason",
+    "confidence": "Confidence",
+    "suggestedFolder": "Suggested folder",
+    "similarBookmarks": "Similar existing bookmarks",
+    "keepAndClassify": "Keep & Classify",
+    "discard": "Discard",
+    "noReview": "No bookmark pending review.",
+    "decided": "Decision recorded."
+  },
+  "tasks": {
+    "title": "Task Queue",
+    "stats": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "filter": {
+      "all": "All",
+      "inProgress": "In Progress",
+      "done": "Completed",
+      "error": "Failed"
+    },
+    "emptyQueue": "No tasks in queue.",
+    "targetFolder": "Target: {{folder}}",
+    "retryTask": "Retry",
+    "clearCompleted": "Clear Completed"
   }
 }

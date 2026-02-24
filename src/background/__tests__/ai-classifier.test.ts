@@ -3,6 +3,8 @@ import {
   classifyBookmark,
   generateFolderStructure,
   extractJsonFromResponse,
+  pruneBookmarks,
+  batchClassifyBookmarks,
 } from "../ai-classifier";
 import type { ApiConfig, FolderNode } from "@/shared/types";
 
@@ -240,6 +242,166 @@ describe("generateFolderStructure", () => {
     const count = (userMsg.match(/"title":/g) ?? []).length;
     expect(count).toBeLessThanOrEqual(500);
     expect(count).toBeGreaterThan(0);
+  });
+});
+
+describe("pruneBookmarks", () => {
+  it("returns prune candidates from LLM response", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue(
+      JSON.stringify({
+        candidates: [
+          {
+            url: "https://google.com/search?q=test",
+            title: "Google Search",
+            reason: "Temporary search result page",
+            category: "low_value",
+          },
+        ],
+      }),
+    );
+
+    const result = await pruneBookmarks(
+      [
+        { title: "Google Search", url: "https://google.com/search?q=test" },
+        { title: "GitHub", url: "https://github.com" },
+      ],
+      config,
+      "en",
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.category).toBe("low_value");
+  });
+
+  it("returns empty array on invalid response", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue("not json");
+
+    const result = await pruneBookmarks(
+      [{ title: "Test", url: "https://test.com" }],
+      config,
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array on API error", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockRejectedValue(new Error("fail"));
+
+    const result = await pruneBookmarks(
+      [{ title: "Test", url: "https://test.com" }],
+      config,
+    );
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe("batchClassifyBookmarks", () => {
+  it("returns classification for each bookmark", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue(
+      JSON.stringify([
+        { url: "https://openai.com", folder_path: "10_📚_Library/10.1_AI", is_new_folder: false, confidence: 0.9 },
+        { url: "https://github.com", folder_path: "01_🔥_Critical", is_new_folder: false, confidence: 0.85 },
+      ]),
+    );
+
+    const result = await batchClassifyBookmarks(
+      [
+        { title: "OpenAI", url: "https://openai.com" },
+        { title: "GitHub", url: "https://github.com" },
+      ],
+      folderTree,
+      config,
+      "en",
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[0]!.folder_path).toBe("10_📚_Library/10.1_AI");
+    expect(result[1]!.folder_path).toBe("01_🔥_Critical");
+  });
+
+  it("falls back to Inbox on API error", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockRejectedValue(new Error("fail"));
+
+    const result = await batchClassifyBookmarks(
+      [{ title: "Test", url: "https://test.com" }],
+      folderTree,
+      config,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.folder_path).toBe("00_📥_Inbox");
+  });
+
+  it("routes low confidence items to Inbox", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue(
+      JSON.stringify([
+        { url: "https://test.com", folder_path: "10_📚_Library", is_new_folder: false, confidence: 0.3 },
+      ]),
+    );
+
+    const result = await batchClassifyBookmarks(
+      [{ title: "Test", url: "https://test.com" }],
+      folderTree,
+      config,
+    );
+
+    expect(result[0]!.folder_path).toBe("00_📥_Inbox");
+  });
+});
+
+describe("locale in prompts", () => {
+  it("passes language instruction to system prompt for classify", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue(
+      JSON.stringify({
+        folder_path: "00_📥_Inbox",
+        is_new_folder: false,
+        confidence: 0.8,
+        reason: "测试",
+      }),
+    );
+
+    await classifyBookmark(
+      { title: "Test", url: "https://test.com" },
+      null,
+      folderTree,
+      config,
+      "zh-CN",
+    );
+
+    const calls = vi.mocked(chatCompletion).mock.calls;
+    const systemMsg = calls[0]?.[0]?.[0]?.content ?? "";
+    expect(systemMsg).toContain("Chinese (Simplified)");
+  });
+
+  it("defaults to English when no locale specified", async () => {
+    const { chatCompletion } = await import("@/shared/lib/api-client");
+    vi.mocked(chatCompletion).mockResolvedValue(
+      JSON.stringify({
+        folder_path: "00_📥_Inbox",
+        is_new_folder: false,
+        confidence: 0.8,
+        reason: "test",
+      }),
+    );
+
+    await classifyBookmark(
+      { title: "Test", url: "https://test.com" },
+      null,
+      folderTree,
+      config,
+    );
+
+    const calls = vi.mocked(chatCompletion).mock.calls;
+    const systemMsg = calls[0]?.[0]?.[0]?.content ?? "";
+    expect(systemMsg).toContain("English");
   });
 });
 

@@ -11,7 +11,8 @@
     "success": "成功",
     "retry": "重试",
     "openSettings": "打开设置",
-    "openInbox": "打开收件箱"
+    "openInbox": "打开收件箱",
+    "skip": "跳过"
   },
   "popup": {
     "status": {
@@ -66,18 +67,75 @@
       "title": "整理书签",
       "backup": "下载备份",
       "backupDone": "备份已下载",
+      "startPrune": "分析并清理",
+      "pruneAnalyzing": "AI 正在分析你的书签，查找重复和低价值项目...",
+      "pruneProgress": "正在分析第 {{current}}/{{total}} 批...",
+      "pruneTitle": "书签清理建议",
+      "pruneDescription": "AI 发现 {{count}} 个可能不需要的书签，选择要删除的：",
+      "pruneEmpty": "你的书签看起来都不错！无需清理。",
+      "pruneConfirm": "删除选中项 ({{count}})",
+      "pruneSkip": "跳过，保留全部",
+      "pruneCategoryDuplicate": "重复",
+      "pruneCategoryOutdated": "过时",
+      "pruneCategoryLowValue": "低价值",
+      "pruneCategoryBroken": "链接失效",
       "generateStructure": "生成结构",
       "generating": "AI 正在分析你的书签...",
       "folderEditor": "编辑文件夹结构",
       "confirmExecute": "确认并整理",
       "processing": "处理中 {{current}}/{{total}}...",
+      "classifying": "AI 正在分类你的书签...",
+      "classifyProgress": "正在分类第 {{current}}/{{total}} 批...",
       "complete": "整理完成！",
       "succeeded": "{{count}} 个成功",
-      "failed": "{{count}} 个失败"
+      "failed": "{{count}} 个失败",
+      "cleanupTitle": "清理旧文件夹",
+      "cleanupDescription": "以下空文件夹可以删除：",
+      "cleanupConfirm": "删除选中的文件夹",
+      "cleanupSkip": "跳过，保留旧文件夹",
+      "cleanupEmpty": "没有发现空文件夹。",
+      "cleanupDone": "清理完成！"
     }
   },
   "notification": {
     "archivedTo": "已归档到 {{folder}}",
     "archiveFailed": "归档 {{title}} 失败"
+  },
+  "sidepanel": {
+    "title": "书签审核",
+    "analyzing": "正在分析书签...",
+    "duplicateFound": "检测到重复",
+    "duplicateDescription": "你已经收藏过此 URL：",
+    "noDuplicate": "未发现重复",
+    "aiAssessment": "AI 评估",
+    "worthKeeping": "值得保留",
+    "notWorthKeeping": "可能不需要",
+    "reason": "原因",
+    "confidence": "置信度",
+    "suggestedFolder": "建议目录",
+    "similarBookmarks": "类似已有书签",
+    "keepAndClassify": "保留并分类",
+    "discard": "丢弃",
+    "noReview": "没有待审核的书签。",
+    "decided": "决定已记录。"
+  },
+  "tasks": {
+    "title": "任务队列",
+    "stats": {
+      "pending": "待处理",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败"
+    },
+    "filter": {
+      "all": "全部",
+      "inProgress": "处理中",
+      "done": "已完成",
+      "error": "失败"
+    },
+    "emptyQueue": "队列中没有任务。",
+    "targetFolder": "目标：{{folder}}",
+    "retryTask": "重试",
+    "clearCompleted": "清除已完成"
   }
 }

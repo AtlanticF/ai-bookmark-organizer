@@ -1,3 +1,5 @@
+import { initFloatingButton } from "./floating-button";
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type !== "EXTRACT_CONTENT") return false;
 
@@ -28,4 +30,4 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-export {};
+initFloatingButton();

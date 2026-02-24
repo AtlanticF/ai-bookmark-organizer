@@ -1,4 +1,5 @@
-import type { StorageSchema } from "@/shared/types";
+import type { ApiConfig, StorageSchema } from "@/shared/types";
+import { decrypt } from "./crypto";
 
 export const STORAGE_KEYS: Record<keyof StorageSchema, keyof StorageSchema> = {
   api_config: "api_config",
@@ -7,6 +8,7 @@ export const STORAGE_KEYS: Record<keyof StorageSchema, keyof StorageSchema> = {
   folder_tree_cache: "folder_tree_cache",
   onboarding_completed: "onboarding_completed",
   bulk_archive_progress: "bulk_archive_progress",
+  pending_bookmark_review: "pending_bookmark_review",
 } as const;
 
 export async function storageGet<K extends keyof StorageSchema>(
@@ -27,6 +29,17 @@ export async function storageRemove<K extends keyof StorageSchema>(
   key: K,
 ): Promise<void> {
   await chrome.storage.local.remove(key);
+}
+
+export async function getDecryptedApiConfig(): Promise<ApiConfig | undefined> {
+  const stored = await storageGet("api_config");
+  if (!stored) return undefined;
+  try {
+    const decryptedKey = stored.apiKey ? await decrypt(stored.apiKey) : "";
+    return { ...stored, apiKey: decryptedKey };
+  } catch {
+    return stored;
+  }
 }
 
 export function onStorageChanged<K extends keyof StorageSchema>(

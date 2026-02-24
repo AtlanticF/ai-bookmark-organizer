@@ -2,14 +2,23 @@ import type { ApiConfig, ChatMessage } from "@/shared/types";
 import { ApiError } from "@/shared/types";
 import { sleep } from "./utils";
 
-const REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 3;
+
+export interface ChatCompletionOptions {
+  jsonMode?: boolean;
+  timeoutMs?: number | null;
+}
 
 export async function chatCompletion(
   messages: ChatMessage[],
   config: ApiConfig,
-  jsonMode = false,
+  options?: boolean | ChatCompletionOptions,
 ): Promise<string> {
+  const opts: ChatCompletionOptions =
+    typeof options === "boolean" ? { jsonMode: options } : (options ?? {});
+  const { jsonMode = false, timeoutMs = DEFAULT_TIMEOUT_MS } = opts;
+
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
   const body: Record<string, unknown> = {
@@ -25,10 +34,9 @@ export async function chatCompletion(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        REQUEST_TIMEOUT_MS,
-      );
+      const timeout = timeoutMs
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
 
       const response = await fetch(url, {
         method: "POST",
@@ -37,10 +45,10 @@ export async function chatCompletion(
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify(body),
-        signal: controller.signal,
+        signal: timeoutMs ? controller.signal : undefined,
       });
 
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");

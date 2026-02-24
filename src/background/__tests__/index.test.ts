@@ -96,7 +96,7 @@ describe("Service Worker Entry", () => {
     expect(chrome.contextMenus.create).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "ai-re-archive",
-        contexts: ["bookmark"],
+        contexts: ["page", "link"],
       }),
     );
   });
@@ -142,7 +142,7 @@ describe("Service Worker Entry", () => {
   });
 
   it("contextMenu click enqueues re-archive task", async () => {
-    vi.mocked(chrome.bookmarks.get).mockResolvedValue([
+    vi.mocked(chrome.bookmarks.search).mockResolvedValue([
       {
         id: "b1",
         title: "Test",
@@ -153,8 +153,8 @@ describe("Service Worker Entry", () => {
     await loadModule();
 
     await onContextMenuCallback(
-      { menuItemId: "ai-re-archive", bookmarkId: "b1" },
-      undefined,
+      { menuItemId: "ai-re-archive", pageUrl: "https://test.com" },
+      { title: "Test" },
     );
 
     const { enqueueTask } = await import("../task-queue");

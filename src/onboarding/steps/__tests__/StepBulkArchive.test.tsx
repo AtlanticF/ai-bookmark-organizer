@@ -87,7 +87,7 @@ describe("StepBulkArchive", () => {
     );
 
     expect(screen.getByText(/Download Backup/i)).toBeInTheDocument();
-    expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
+    expect(screen.getByText(/Analyze & Clean Up/i)).toBeInTheDocument();
   });
 
   it("shows backup done indicator after download", async () => {

@@ -14,6 +14,7 @@ export default defineManifest({
     "scripting",
     "contextMenus",
     "alarms",
+    "sidePanel",
   ],
   host_permissions: ["<all_urls>"],
   background: {
@@ -30,6 +31,9 @@ export default defineManifest({
     },
   },
   options_page: "src/options/index.html",
+  side_panel: {
+    default_path: "src/sidepanel/index.html",
+  },
   content_scripts: [
     {
       matches: ["<all_urls>"],

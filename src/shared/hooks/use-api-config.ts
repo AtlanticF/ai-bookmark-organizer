@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { storageGet, storageSet } from "@/shared/lib/storage";
-import { encrypt, decrypt } from "@/shared/lib/crypto";
+import { storageSet, getDecryptedApiConfig } from "@/shared/lib/storage";
+import { encrypt } from "@/shared/lib/crypto";
 import type { ApiConfig } from "@/shared/types";
 
 const EMPTY_CONFIG: ApiConfig = { baseUrl: "", apiKey: "", model: "" };
@@ -12,17 +12,10 @@ export function useApiConfig() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const stored = await storageGet("api_config");
+      const decrypted = await getDecryptedApiConfig();
       if (cancelled) return;
-      if (stored) {
-        try {
-          const decryptedKey = stored.apiKey
-            ? await decrypt(stored.apiKey)
-            : "";
-          setConfigState({ ...stored, apiKey: decryptedKey });
-        } catch {
-          setConfigState(stored);
-        }
+      if (decrypted) {
+        setConfigState(decrypted);
       }
       setLoading(false);
     })();

@@ -1,4 +1,4 @@
-import type { FolderNode } from "@/shared/types";
+import type { EmptyFolder, FolderNode } from "@/shared/types";
 
 export interface FlatBookmark {
   id: string;
@@ -9,7 +9,10 @@ export interface FlatBookmark {
 
 export async function getFullTree(): Promise<FolderNode[]> {
   const tree = await chrome.bookmarks.getTree();
-  return normalizeTree(tree);
+  const userFolders = (tree[0]?.children ?? []).flatMap(
+    (root) => root.children ?? [],
+  );
+  return normalizeTree(userFolders);
 }
 
 function normalizeTree(
@@ -105,13 +108,170 @@ export async function ensureFolderExists(
   return currentParentId;
 }
 
+export async function findEmptyFolders(
+  excludePrefixes: string[],
+): Promise<EmptyFolder[]> {
+  const tree = await chrome.bookmarks.getTree();
+  const bookmarksBar = tree[0]?.children?.[0];
+  if (!bookmarksBar?.children) return [];
+
+  const empties: EmptyFolder[] = [];
+
+  function isExcluded(title: string): boolean {
+    return excludePrefixes.some((p) => title.startsWith(p));
+  }
+
+  function walk(
+    nodes: chrome.bookmarks.BookmarkTreeNode[],
+    pathPrefix: string,
+  ) {
+    for (const node of nodes) {
+      if (node.url) continue;
+      const path = pathPrefix ? `${pathPrefix}/${node.title}` : node.title;
+      if (isExcluded(node.title)) continue;
+
+      const children = node.children ?? [];
+      const hasBookmarks = children.some((c) => !!c.url);
+      const childFolders = children.filter((c) => !c.url);
+
+      if (!hasBookmarks && childFolders.length === 0) {
+        empties.push({ id: node.id, title: node.title, path });
+      } else {
+        walk(childFolders, path);
+      }
+    }
+  }
+
+  walk(bookmarksBar.children, "");
+  return empties;
+}
+
+export async function removeFolders(ids: string[]): Promise<void> {
+  for (const id of ids) {
+    try {
+      await chrome.bookmarks.removeTree(id);
+    } catch {
+      // folder may already be gone
+    }
+  }
+}
+
+export async function reorderChildrenByName(
+  parentId: string,
+): Promise<void> {
+  const children = await chrome.bookmarks.getChildren(parentId);
+  const folders = children.filter((c) => !c.url);
+
+  const sorted = [...folders].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { numeric: true }),
+  );
+
+  for (let i = 0; i < sorted.length; i++) {
+    await chrome.bookmarks.move(sorted[i]!.id, { parentId, index: i });
+  }
+}
+
+export async function reorderAllFolders(): Promise<void> {
+  const tree = await chrome.bookmarks.getTree();
+  const bookmarksBar = tree[0]?.children?.[0];
+  if (!bookmarksBar) return;
+
+  await reorderChildrenByName(bookmarksBar.id);
+
+  const refreshed = await chrome.bookmarks.getChildren(bookmarksBar.id);
+  for (const child of refreshed) {
+    if (!child.url) {
+      await reorderChildrenByName(child.id);
+    }
+  }
+}
+
+export function sortFoldersByPrefix<
+  T extends { name: string; children?: { name: string }[] },
+>(folders: T[]): T[] {
+  const sorted = [...folders].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+  for (const folder of sorted) {
+    if (folder.children && folder.children.length > 1) {
+      folder.children = [...folder.children].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      );
+    }
+  }
+  return sorted;
+}
+
+export interface DuplicatePrefixGroup {
+  prefix: string;
+  folders: { id: string; title: string; bookmarkCount: number }[];
+}
+
+export async function findDuplicatePrefixFolders(): Promise<DuplicatePrefixGroup[]> {
+  const tree = await chrome.bookmarks.getTree();
+  const bookmarksBar = tree[0]?.children?.[0];
+  if (!bookmarksBar?.children) return [];
+
+  const byPrefix = new Map<string, { id: string; title: string; bookmarkCount: number }[]>();
+
+  for (const node of bookmarksBar.children) {
+    if (node.url) continue;
+    const match = node.title.match(/^(\d+)/);
+    if (!match?.[1]) continue;
+    const prefix = match[1];
+    const list = byPrefix.get(prefix) ?? [];
+    const bookmarkCount = countBookmarksRecursive(node);
+    list.push({ id: node.id, title: node.title, bookmarkCount });
+    byPrefix.set(prefix, list);
+  }
+
+  const duplicates: DuplicatePrefixGroup[] = [];
+  for (const [prefix, folders] of byPrefix) {
+    if (folders.length > 1) {
+      duplicates.push({ prefix, folders });
+    }
+  }
+  return duplicates;
+}
+
+function countBookmarksRecursive(node: chrome.bookmarks.BookmarkTreeNode): number {
+  let count = 0;
+  for (const child of node.children ?? []) {
+    if (child.url) count++;
+    else count += countBookmarksRecursive(child);
+  }
+  return count;
+}
+
+export async function mergeFoldersInto(
+  keepFolderId: string,
+  removeFolderIds: string[],
+): Promise<void> {
+  for (const folderId of removeFolderIds) {
+    const children = await chrome.bookmarks.getChildren(folderId);
+    for (const child of children) {
+      await chrome.bookmarks.move(child.id, { parentId: keepFolderId });
+    }
+    try {
+      await chrome.bookmarks.removeTree(folderId);
+    } catch {
+      // already removed
+    }
+  }
+}
+
 export function buildTreeForPrompt(
   nodes: FolderNode[],
   indent = 0,
 ): string {
   const lines: string[] = [];
   for (const node of nodes) {
-    if (!node.title) continue;
+    if (!node.title) {
+      if (node.children) {
+        lines.push(buildTreeForPrompt(node.children, indent));
+      }
+      continue;
+    }
     lines.push(`${"  ".repeat(indent)}${node.title}`);
     if (node.children) {
       lines.push(buildTreeForPrompt(node.children, indent + 1));

@@ -5,17 +5,17 @@ import "@/shared/i18n";
 import StepConnTest from "../StepConnTest";
 
 vi.mock("@/shared/lib/storage", () => ({
-  storageGet: vi.fn(),
+  getDecryptedApiConfig: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/api-client", () => ({
   testConnection: vi.fn(),
 }));
 
-import { storageGet } from "@/shared/lib/storage";
+import { getDecryptedApiConfig } from "@/shared/lib/storage";
 import { testConnection } from "@/shared/lib/api-client";
 
-const mockStorageGet = vi.mocked(storageGet);
+const mockGetConfig = vi.mocked(getDecryptedApiConfig);
 const mockTestConnection = vi.mocked(testConnection);
 
 const fakeConfig = {
@@ -30,19 +30,19 @@ beforeEach(() => {
 
 describe("StepConnTest", () => {
   it("auto-triggers connection test on mount", async () => {
-    mockStorageGet.mockResolvedValue(fakeConfig);
+    mockGetConfig.mockResolvedValue(fakeConfig);
     mockTestConnection.mockResolvedValue(true);
 
     render(<StepConnTest onSuccess={vi.fn()} onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(mockStorageGet).toHaveBeenCalledWith("api_config");
+      expect(mockGetConfig).toHaveBeenCalled();
       expect(mockTestConnection).toHaveBeenCalledWith(fakeConfig);
     });
   });
 
   it("shows success state and enables Next", async () => {
-    mockStorageGet.mockResolvedValue(fakeConfig);
+    mockGetConfig.mockResolvedValue(fakeConfig);
     mockTestConnection.mockResolvedValue(true);
 
     render(<StepConnTest onSuccess={vi.fn()} onBack={vi.fn()} />);
@@ -56,7 +56,7 @@ describe("StepConnTest", () => {
   });
 
   it("shows error state with retry button on failure", async () => {
-    mockStorageGet.mockResolvedValue(fakeConfig);
+    mockGetConfig.mockResolvedValue(fakeConfig);
     mockTestConnection.mockResolvedValue(false);
 
     render(<StepConnTest onSuccess={vi.fn()} onBack={vi.fn()} />);
@@ -72,7 +72,7 @@ describe("StepConnTest", () => {
   });
 
   it("shows error when API config is missing", async () => {
-    mockStorageGet.mockResolvedValue(undefined);
+    mockGetConfig.mockResolvedValue(undefined);
 
     render(<StepConnTest onSuccess={vi.fn()} onBack={vi.fn()} />);
 
@@ -84,7 +84,7 @@ describe("StepConnTest", () => {
   });
 
   it("retry button retries the test", async () => {
-    mockStorageGet.mockResolvedValue(fakeConfig);
+    mockGetConfig.mockResolvedValue(fakeConfig);
     mockTestConnection
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
@@ -104,7 +104,7 @@ describe("StepConnTest", () => {
   });
 
   it("Back button calls onBack", async () => {
-    mockStorageGet.mockResolvedValue(fakeConfig);
+    mockGetConfig.mockResolvedValue(fakeConfig);
     mockTestConnection.mockResolvedValue(true);
     const onBack = vi.fn();
     const user = userEvent.setup();

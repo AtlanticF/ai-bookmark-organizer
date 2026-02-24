@@ -1,10 +1,9 @@
-import { storageGet } from "@/shared/lib/storage";
+import { storageGet, storageSet, getDecryptedApiConfig } from "@/shared/lib/storage";
 import { testConnection } from "@/shared/lib/api-client";
-import { initBookmarkListener, ensureInboxExists } from "./bookmark-listener";
+import { initBookmarkListener, ensureInboxExists, markAsMoving, unmarkAsMoving } from "./bookmark-listener";
 import {
   dequeueTask,
   updateTask,
-  removeTask,
   getQueueLength,
   enqueueTask,
 } from "./task-queue";
@@ -25,7 +24,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.contextMenus.create({
     id: "ai-re-archive",
     title: "AI Re-archive this bookmark",
-    contexts: ["bookmark" as chrome.contextMenus.ContextType],
+    contexts: ["page", "link"],
   });
 
   if (details.reason === "install") {
@@ -36,7 +35,29 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       });
     }
   }
+
+  injectContentScriptIntoExistingTabs();
+  updateBadge();
 });
+
+async function injectContentScriptIntoExistingTabs() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["src/content/index.ts"],
+        });
+      } catch {
+        // Tab may not allow script injection
+      }
+    }
+  } catch {
+    // Permissions may not be available
+  }
+}
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === QUEUE_ALARM) {
@@ -44,23 +65,38 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-chrome.contextMenus.onClicked.addListener(async (info) => {
-  const bookmarkId = (info as unknown as { bookmarkId?: string }).bookmarkId;
-  if (info.menuItemId === "ai-re-archive" && bookmarkId) {
-    const bookmarks = await chrome.bookmarks.get(bookmarkId);
-    const bookmark = bookmarks[0];
-    if (bookmark?.url) {
-      await enqueueTask({
-        id: generateId(),
-        bookmarkId: bookmark.id,
-        title: bookmark.title,
-        url: bookmark.url,
-        status: "pending",
-        createdAt: Date.now(),
-      });
-      processQueue();
-    }
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "ai-re-archive") return;
+
+  const targetUrl = info.linkUrl ?? info.pageUrl;
+  if (!targetUrl) return;
+
+  const results = await chrome.bookmarks.search({ url: targetUrl });
+  const bookmark = results[0];
+  if (bookmark) {
+    await enqueueTask({
+      id: generateId(),
+      bookmarkId: bookmark.id,
+      title: bookmark.title,
+      url: bookmark.url,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+  } else if (tab?.title) {
+    const created = await chrome.bookmarks.create({
+      title: tab.title,
+      url: targetUrl,
+    });
+    await enqueueTask({
+      id: generateId(),
+      bookmarkId: created.id,
+      title: tab.title,
+      url: targetUrl,
+      status: "pending",
+      createdAt: Date.now(),
+    });
   }
+  processQueue();
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -79,13 +115,63 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message.type === "REVIEW_DECISION") {
+    handleReviewDecision(
+      message.payload.bookmarkId,
+      message.payload.decision,
+    ).then(sendResponse);
+    return true;
+  }
+
+  if (message.type === "OPEN_TASKS_PAGE") {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("src/tasks/index.html"),
+    });
+    sendResponse({ opened: true });
+    return false;
+  }
+
+  if (message.type === "_PROCESS_QUEUE") {
+    processQueue();
+    sendResponse({ ok: true });
+    return false;
+  }
+
   return false;
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.task_queue) {
+    updateBadge();
+  }
 });
 
 initBookmarkListener();
 
+async function updateBadge() {
+  try {
+    const queue = (await storageGet("task_queue")) ?? [];
+    const active = queue.filter(
+      (t) =>
+        t.status === "pending" ||
+        t.status === "extracting" ||
+        t.status === "classifying" ||
+        t.status === "moving",
+    ).length;
+
+    if (active > 0) {
+      await chrome.action.setBadgeText({ text: String(active) });
+      await chrome.action.setBadgeBackgroundColor({ color: "#3b82f6" });
+    } else {
+      await chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {
+    // Badge API may not be available in all contexts
+  }
+}
+
 async function handleTestConnection(): Promise<{ success: boolean }> {
-  const config = await storageGet("api_config");
+  const config = await getDecryptedApiConfig();
   if (!config) return { success: false };
   const success = await testConnection(config);
   return { success };
@@ -111,6 +197,61 @@ async function handleReArchive(
   return { enqueued: true };
 }
 
+async function handleReviewDecision(
+  bookmarkId: string,
+  decision: "keep" | "discard",
+): Promise<{ success: boolean }> {
+  try {
+    if (decision === "discard") {
+      await chrome.bookmarks.remove(bookmarkId);
+      await storageSet("pending_bookmark_review", null);
+      return { success: true };
+    }
+
+    const config = await getDecryptedApiConfig();
+    if (!config) {
+      const inboxId = await ensureInboxExists();
+      markAsMoving(bookmarkId);
+      await chrome.bookmarks.move(bookmarkId, { parentId: inboxId });
+      unmarkAsMoving(bookmarkId);
+      await storageSet("pending_bookmark_review", null);
+      return { success: true };
+    }
+
+    const tree = await getFullTree();
+    const bookmarks = await chrome.bookmarks.get(bookmarkId);
+    const bookmark = bookmarks[0];
+    if (!bookmark?.url) {
+      await storageSet("pending_bookmark_review", null);
+      return { success: false };
+    }
+
+    const locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
+    const classification = await classifyBookmark(
+      { title: bookmark.title, url: bookmark.url },
+      null,
+      tree,
+      config,
+      locale,
+    );
+
+    await moveBookmark(
+      bookmarkId,
+      classification.folder_path,
+      classification.is_new_folder,
+      bookmark.title,
+      bookmark.url,
+      "00_📥_Inbox",
+    );
+
+    await storageSet("pending_bookmark_review", null);
+    return { success: true };
+  } catch {
+    await storageSet("pending_bookmark_review", null);
+    return { success: false };
+  }
+}
+
 let processing = false;
 
 async function processQueue(): Promise<void> {
@@ -134,7 +275,7 @@ async function processQueue(): Promise<void> {
 
       await updateTask(task.id, { status: "classifying" });
 
-      const config = await storageGet("api_config");
+      const config = await getDecryptedApiConfig();
       if (!config) {
         await updateTask(task.id, {
           status: "error",
@@ -144,11 +285,13 @@ async function processQueue(): Promise<void> {
       }
 
       const tree = await getFullTree();
+      const queueLocale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
       const classification = await classifyBookmark(
         { title: task.title, url: task.url },
         content,
         tree,
         config,
+        queueLocale,
       );
 
       await updateTask(task.id, { status: "moving" });
@@ -163,7 +306,10 @@ async function processQueue(): Promise<void> {
       );
 
       if (result.success) {
-        await removeTask(task.id);
+        await updateTask(task.id, {
+          status: "done",
+          targetFolder: result.toFolder,
+        });
         notifyArchiveSuccess(task.title, result.toFolder);
       } else {
         await updateTask(task.id, {
@@ -175,6 +321,7 @@ async function processQueue(): Promise<void> {
     }
   } finally {
     processing = false;
+    updateBadge();
   }
 }
 

@@ -57,6 +57,51 @@ export interface ClassificationResponse {
   reason: string;
 }
 
+export interface BookmarkAssessment {
+  isWorthKeeping: boolean;
+  reason: string;
+  confidence: number;
+  suggestedFolder: string;
+  similarExisting: string[];
+}
+
+export interface PendingBookmarkReview {
+  bookmarkId: string;
+  title: string;
+  url: string;
+  status: "analyzing" | "ready" | "decided";
+  duplicates: { id: string; title: string; url: string }[];
+  assessment?: BookmarkAssessment;
+}
+
+export interface BulkClassifyProgress {
+  total: number;
+  completed: number;
+  failed: number;
+  currentTitle: string;
+  status: "classifying" | "moving" | "done" | "error";
+}
+
+export interface EmptyFolder {
+  id: string;
+  title: string;
+  path: string;
+}
+
+export interface PruneCandidate {
+  title: string;
+  url: string;
+  reason: string;
+  category: "duplicate" | "outdated" | "low_value" | "broken";
+}
+
+export interface BatchClassificationItem {
+  url: string;
+  folder_path: string;
+  is_new_folder: boolean;
+  confidence: number;
+}
+
 export interface ProposedFolder {
   name: string;
   description: string;
@@ -105,7 +150,9 @@ export type ExtensionMessage =
   | { type: "EXTRACT_CONTENT" }
   | { type: "TEST_API_CONNECTION" }
   | { type: "START_BULK_ARCHIVE"; payload: { folders: ProposedFolder[] } }
-  | { type: "RE_ARCHIVE_BOOKMARK"; payload: { bookmarkId: string } };
+  | { type: "RE_ARCHIVE_BOOKMARK"; payload: { bookmarkId: string } }
+  | { type: "REVIEW_DECISION"; payload: { bookmarkId: string; decision: "keep" | "discard" } }
+  | { type: "OPEN_TASKS_PAGE" };
 
 export interface StorageSchema {
   api_config: ApiConfig;
@@ -114,4 +161,5 @@ export interface StorageSchema {
   folder_tree_cache: FolderTreeCache;
   onboarding_completed: boolean;
   bulk_archive_progress: BulkProgress;
+  pending_bookmark_review: PendingBookmarkReview | null;
 }
