@@ -14,11 +14,13 @@ export interface QueueTask {
     | "extracting"
     | "classifying"
     | "moving"
+    | "renaming"
     | "done"
     | "error";
   tabId?: number;
   content?: string;
   targetFolder?: string;
+  renamedTitle?: string;
   error?: string;
   createdAt: number;
 }
@@ -162,4 +164,6 @@ export interface StorageSchema {
   onboarding_completed: boolean;
   bulk_archive_progress: BulkProgress;
   pending_bookmark_review: PendingBookmarkReview | null;
+  show_floating_button: boolean;
+  language: string;
 }

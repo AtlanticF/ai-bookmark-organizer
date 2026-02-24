@@ -8,7 +8,7 @@ import {
   enqueueTask,
 } from "./task-queue";
 import { extractContent } from "./content-extractor";
-import { classifyBookmark } from "./ai-classifier";
+import { classifyBookmark, renameBookmark } from "./ai-classifier";
 import { moveBookmark } from "./bookmark-mover";
 import { notifyArchiveSuccess, notifyArchiveError } from "./notification";
 import { getFullTree } from "@/shared/lib/bookmark-tree";
@@ -125,7 +125,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "OPEN_TASKS_PAGE") {
     chrome.tabs.create({
-      url: chrome.runtime.getURL("src/tasks/index.html"),
+      url: chrome.runtime.getURL("src/options/index.html?tab=tasks"),
     });
     sendResponse({ opened: true });
     return false;
@@ -156,7 +156,8 @@ async function updateBadge() {
         t.status === "pending" ||
         t.status === "extracting" ||
         t.status === "classifying" ||
-        t.status === "moving",
+        t.status === "moving" ||
+        t.status === "renaming",
     ).length;
 
     if (active > 0) {
@@ -306,11 +307,28 @@ async function processQueue(): Promise<void> {
       );
 
       if (result.success) {
+        await updateTask(task.id, { status: "renaming" });
+
+        const newTitle = await renameBookmark(
+          { title: task.title, url: task.url },
+          config,
+          queueLocale,
+        );
+
+        if (newTitle !== task.title) {
+          try {
+            await chrome.bookmarks.update(task.bookmarkId, { title: newTitle });
+          } catch {
+            // Bookmark may have been removed
+          }
+        }
+
         await updateTask(task.id, {
           status: "done",
           targetFolder: result.toFolder,
+          renamedTitle: newTitle !== task.title ? newTitle : undefined,
         });
-        notifyArchiveSuccess(task.title, result.toFolder);
+        notifyArchiveSuccess(newTitle, result.toFolder);
       } else {
         await updateTask(task.id, {
           status: "error",

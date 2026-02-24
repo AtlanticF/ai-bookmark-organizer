@@ -27,6 +27,11 @@
   },
   "options": {
     "title": "Settings",
+    "nav": {
+      "llm": "LLM Config",
+      "system": "System",
+      "tasks": "Task Queue"
+    },
     "apiBaseUrl": "API Base URL",
     "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
     "apiKey": "API Key",
@@ -37,7 +42,12 @@
     "testSuccess": "Connection successful!",
     "testFailed": "Connection failed: {{error}}",
     "saved": "Settings saved",
-    "rerunArchive": "Re-run Full Archive"
+    "rerunArchive": "Re-run Full Archive",
+    "system": {
+      "fabLabel": "Floating Button",
+      "fabDescription": "Show the floating bookmark button on web pages",
+      "languageLabel": "Language"
+    }
   },
   "onboarding": {
     "title": "Welcome to AI Bookmark Organizer",
@@ -135,6 +145,7 @@
     },
     "emptyQueue": "No tasks in queue.",
     "targetFolder": "Target: {{folder}}",
+    "originalTitle": "Original: {{title}}",
     "retryTask": "Retry",
     "clearCompleted": "Clear Completed"
   }

@@ -96,6 +96,49 @@ RULES:
 
 Respond ONLY with valid JSON. No explanations outside JSON.`;
 
+const RENAME_SYSTEM_PROMPT = `You are a bookmark naming expert. Transform raw page titles into standardized bookmark names.
+
+NAMING FORMULA:
+[Attribute] Core Keywords : Supplementary Note | Source #Tag
+
+FIELD RULES:
+- [Attribute]: REQUIRED. One of: [Todo], [Tool], [Ref], [Doc], [Tutorial], [Lib].
+- Core Keywords: REQUIRED. Extract the most essential subject, keep it concise.
+- Supplementary Note: OPTIONAL. Describe specific use case or what the page solves. Omit if title lacks enough info.
+- Source: REQUIRED. Site or platform short name, separated by |.
+- #Tag: OPTIONAL. 1-2 classification keywords at the end.
+
+PROCESSING RULES:
+- NO EMOJI: Plain text only.
+- Remove noise: Delete meaningless suffixes like "Home", "Login", "Official Website", "- Google Search", "(Powered by...)".
+- Differentiate: For well-known sites (GitHub, YouTube, Gmail), focus on the specific sub-page content, not the site name.
+- Keep concise: The entire name should ideally be under 60 characters.
+
+Respond ONLY with the renamed title. No explanations, no quotes, no extra formatting.`;
+
+export async function renameBookmark(
+  bookmark: { title: string; url: string },
+  config: ApiConfig,
+  locale = "en",
+): Promise<string> {
+  const userPrompt = `Original title: ${bookmark.title}
+URL: ${bookmark.url}`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: RENAME_SYSTEM_PROMPT + langInstruction(locale) },
+    { role: "user", content: userPrompt },
+  ];
+
+  try {
+    const response = await chatCompletion(messages, config);
+    const renamed = response.trim().replace(/^["']|["']$/g, "");
+    if (!renamed || renamed.length < 3) return bookmark.title;
+    return renamed;
+  } catch {
+    return bookmark.title;
+  }
+}
+
 export async function classifyBookmark(
   bookmark: { title: string; url: string },
   content: ContentExtractionResult | null,

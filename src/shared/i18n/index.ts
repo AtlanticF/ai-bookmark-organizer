@@ -9,8 +9,19 @@ const resources = {
   "zh-CN": { translation: zhCN },
 };
 
+const chromeStorageDetector = {
+  name: "chromeStorage",
+  lookup(options: Record<string, unknown>) {
+    return undefined as string | undefined;
+  },
+  cacheUserLanguage() {},
+};
+
+const detector = new LanguageDetector();
+detector.addDetector(chromeStorageDetector);
+
 i18n
-  .use(LanguageDetector)
+  .use(detector)
   .use(initReactI18next)
   .init({
     resources,
@@ -19,9 +30,17 @@ i18n
       escapeValue: false,
     },
     detection: {
-      order: ["navigator", "htmlTag"],
+      order: ["chromeStorage", "navigator", "htmlTag"],
       caches: [],
     },
   });
+
+if (typeof chrome !== "undefined" && chrome.storage?.local) {
+  chrome.storage.local.get("language").then((result) => {
+    if (result.language && result.language !== i18n.language) {
+      i18n.changeLanguage(result.language);
+    }
+  }).catch(() => {});
+}
 
 export default i18n;

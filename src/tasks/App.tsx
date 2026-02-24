@@ -10,6 +10,7 @@ const STATUS_LABELS: Record<QueueTask["status"], string> = {
   extracting: "Extracting",
   classifying: "Classifying",
   moving: "Moving",
+  renaming: "Renaming",
   done: "Done",
   error: "Error",
 };
@@ -19,6 +20,7 @@ const STATUS_COLORS: Record<QueueTask["status"], string> = {
   extracting: "bg-blue-100 text-blue-700",
   classifying: "bg-purple-100 text-purple-700",
   moving: "bg-yellow-100 text-yellow-700",
+  renaming: "bg-indigo-100 text-indigo-700",
   done: "bg-green-100 text-green-700",
   error: "bg-red-100 text-red-700",
 };
@@ -48,27 +50,23 @@ export default function App() {
     };
   }, []);
 
+  const isActive = (s: QueueTask["status"]) =>
+    s === "pending" ||
+    s === "extracting" ||
+    s === "classifying" ||
+    s === "moving" ||
+    s === "renaming";
+
   const stats = {
     pending: tasks.filter((t) => t.status === "pending").length,
-    processing: tasks.filter(
-      (t) =>
-        t.status === "extracting" ||
-        t.status === "classifying" ||
-        t.status === "moving",
-    ).length,
+    processing: tasks.filter((t) => isActive(t.status) && t.status !== "pending").length,
     completed: tasks.filter((t) => t.status === "done").length,
     failed: tasks.filter((t) => t.status === "error").length,
   };
 
   const filtered = tasks.filter((task) => {
     if (filter === "all") return true;
-    if (filter === "inProgress")
-      return (
-        task.status === "pending" ||
-        task.status === "extracting" ||
-        task.status === "classifying" ||
-        task.status === "moving"
-      );
+    if (filter === "inProgress") return isActive(task.status);
     if (filter === "done") return task.status === "done";
     if (filter === "error") return task.status === "error";
     return true;
@@ -168,9 +166,14 @@ export default function App() {
               className="flex items-center gap-3 p-3 border border-border rounded-md"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" title={task.title}>
-                  {task.title}
+                <p className="text-sm font-medium truncate" title={task.renamedTitle ?? task.title}>
+                  {task.renamedTitle ?? task.title}
                 </p>
+                {task.renamedTitle && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5" title={task.title}>
+                    {t("tasks.originalTitle", { title: task.title })}
+                  </p>
+                )}
                 <p
                   className="text-xs text-muted-foreground truncate"
                   title={task.url}

@@ -9,6 +9,8 @@ export const STORAGE_KEYS: Record<keyof StorageSchema, keyof StorageSchema> = {
   onboarding_completed: "onboarding_completed",
   bulk_archive_progress: "bulk_archive_progress",
   pending_bookmark_review: "pending_bookmark_review",
+  show_floating_button: "show_floating_button",
+  language: "language",
 } as const;
 
 export async function storageGet<K extends keyof StorageSchema>(

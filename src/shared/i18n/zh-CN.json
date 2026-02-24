@@ -27,6 +27,11 @@
   },
   "options": {
     "title": "设置",
+    "nav": {
+      "llm": "LLM 配置",
+      "system": "系统设置",
+      "tasks": "任务队列"
+    },
     "apiBaseUrl": "API 地址",
     "apiBaseUrlPlaceholder": "https://api.openai.com/v1",
     "apiKey": "API 密钥",
@@ -37,7 +42,12 @@
     "testSuccess": "连接成功！",
     "testFailed": "连接失败：{{error}}",
     "saved": "设置已保存",
-    "rerunArchive": "重新全量归档"
+    "rerunArchive": "重新全量归档",
+    "system": {
+      "fabLabel": "悬浮按钮",
+      "fabDescription": "在网页右下角显示书签悬浮按钮",
+      "languageLabel": "语言"
+    }
   },
   "onboarding": {
     "title": "欢迎使用 AI 书签整理器",
@@ -135,6 +145,7 @@
     },
     "emptyQueue": "队列中没有任务。",
     "targetFolder": "目标：{{folder}}",
+    "originalTitle": "原名：{{title}}",
     "retryTask": "重试",
     "clearCompleted": "清除已完成"
   }
