@@ -160,4 +160,4 @@ pnpm build
 
 ## License
 
-MIT © [matt](https://github.com/matt)
+MIT © [AtlanticF](https://github.com/AtlanticF)
