@@ -3,3 +3,7 @@ dist/
 .env
 coverage/
 *.tsbuildinfo
+
+.DS_Store
+dist.zip
+package-lock.json
