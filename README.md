@@ -155,3 +155,9 @@ pnpm build
 - Your API key is stored locally in `chrome.storage.local` (encrypted).
 - Bookmark data and page content are sent only to the LLM endpoint you configure.
 - No analytics, no telemetry, no external servers.
+
+---
+
+## License
+
+MIT © [matt](https://github.com/matt)
