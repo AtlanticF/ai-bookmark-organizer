@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../bookmark-listener", () => ({
   initBookmarkListener: vi.fn(),
   ensureInboxExists: vi.fn().mockResolvedValue("inbox-id"),
+  restorePendingDebounce: vi.fn().mockResolvedValue(undefined),
   markAsMoving: vi.fn(),
   unmarkAsMoving: vi.fn(),
 }));
@@ -37,6 +38,7 @@ vi.mock("../bookmark-mover", () => ({
 vi.mock("../notification", () => ({
   notifyArchiveSuccess: vi.fn(),
   notifyArchiveError: vi.fn(),
+  clearExpiredUndoRecords: vi.fn().mockResolvedValue(undefined),
 }));
 
 type Callback = (...args: unknown[]) => void;

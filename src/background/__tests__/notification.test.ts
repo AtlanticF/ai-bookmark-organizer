@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { notifyArchiveSuccess, notifyArchiveError } from "../notification";
+
+const SUCCESS_PARAMS = {
+  bookmarkTitle: "My Page",
+  folderName: "01_🔥_Critical",
+  bookmarkId: "b1",
+  originalParentId: "p1",
+  targetParentId: "p2",
+  originalTitle: "My Page",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -12,7 +21,7 @@ afterEach(() => {
 
 describe("notifyArchiveSuccess", () => {
   it("creates chrome notification with correct params", () => {
-    notifyArchiveSuccess("My Page", "01_🔥_Critical");
+    notifyArchiveSuccess(SUCCESS_PARAMS);
 
     expect(chrome.notifications.create).toHaveBeenCalledWith(
       expect.any(String),
@@ -24,11 +33,11 @@ describe("notifyArchiveSuccess", () => {
     );
   });
 
-  it("auto-clears notification after 5 seconds", () => {
-    notifyArchiveSuccess("My Page", "01_🔥_Critical");
+  it("auto-clears notification after 15 seconds", () => {
+    notifyArchiveSuccess(SUCCESS_PARAMS);
 
     expect(chrome.notifications.clear).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(5_000);
+    vi.advanceTimersByTime(15_000);
     expect(chrome.notifications.clear).toHaveBeenCalled();
   });
 });

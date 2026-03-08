@@ -166,10 +166,13 @@ describe("Options Page", () => {
   });
 
   it("renders re-run archive button", async () => {
+    const user = userEvent.setup();
     render(<App />);
 
+    await user.click(screen.getByRole("button", { name: /Archive/i }));
+
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Re-run Full Archive/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Start Full Archive/i })).toBeInTheDocument();
     });
   });
 });

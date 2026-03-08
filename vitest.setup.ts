@@ -61,6 +61,7 @@ const chromeMock = {
     create: vi.fn(),
     clear: vi.fn(),
     onClicked: createEvent(),
+    onButtonClicked: createEvent(),
   },
   alarms: {
     create: vi.fn(),

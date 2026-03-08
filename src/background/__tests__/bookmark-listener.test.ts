@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   ensureInboxExists,
   initBookmarkListener,
@@ -10,6 +10,8 @@ import {
 vi.mock("../task-queue", () => ({
   enqueueTask: vi.fn().mockResolvedValue(undefined),
 }));
+
+const DEBOUNCE_INITIAL_MS = 5_000;
 
 let store: Record<string, unknown> = {};
 
@@ -34,6 +36,14 @@ beforeEach(() => {
   store = {};
   vi.clearAllMocks();
   vi.mocked(chrome.bookmarks.getTree).mockResolvedValue(mockTree);
+  vi.mocked(chrome.bookmarks.get).mockImplementation(async (id: string) => {
+    const nodes: Record<string, chrome.bookmarks.BookmarkTreeNode> = {
+      b1: { id: "b1", title: "Test Page", url: "https://test.com", parentId: "1" } as chrome.bookmarks.BookmarkTreeNode,
+      b7: { id: "b7", title: "Normal Page", url: "https://normal.com", parentId: "1" } as chrome.bookmarks.BookmarkTreeNode,
+    };
+    const node = nodes[id];
+    return node ? [node] : [];
+  });
   vi.mocked(chrome.bookmarks.move).mockResolvedValue({} as chrome.bookmarks.BookmarkTreeNode);
   vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({});
 
@@ -48,6 +58,10 @@ beforeEach(() => {
       Object.assign(store, items);
     },
   );
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("ensureInboxExists", () => {
@@ -79,7 +93,8 @@ describe("ensureInboxExists", () => {
 });
 
 describe("handleBookmarkCreated", () => {
-  it("moves bookmark to Inbox and enqueues classification task", async () => {
+  it("enqueues classification task after debounce", async () => {
+    vi.useFakeTimers();
     store.api_config = {
       baseUrl: "https://api.test.com/v1",
       apiKey: "test-key",
@@ -93,9 +108,9 @@ describe("handleBookmarkCreated", () => {
       parentId: "1",
     } as chrome.bookmarks.BookmarkTreeNode);
 
-    expect(chrome.bookmarks.move).toHaveBeenCalledWith("b1", {
-      parentId: "10",
-    });
+    expect(chrome.bookmarks.move).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_INITIAL_MS);
 
     const { enqueueTask } = await import("../task-queue");
     expect(enqueueTask).toHaveBeenCalledWith(
@@ -130,7 +145,7 @@ describe("handleBookmarkCreated", () => {
     expect(chrome.bookmarks.move).not.toHaveBeenCalled();
   });
 
-  it("moves to Inbox but skips enqueue when API is not configured", async () => {
+  it("skips enqueue when API is not configured", async () => {
     await _handleBookmarkCreated("b4", {
       id: "b4",
       title: "No API",
@@ -138,10 +153,7 @@ describe("handleBookmarkCreated", () => {
       parentId: "1",
     } as chrome.bookmarks.BookmarkTreeNode);
 
-    expect(chrome.bookmarks.move).toHaveBeenCalledWith("b4", {
-      parentId: "10",
-    });
-
+    expect(chrome.bookmarks.move).not.toHaveBeenCalled();
     const { enqueueTask } = await import("../task-queue");
     expect(enqueueTask).not.toHaveBeenCalled();
   });
@@ -168,6 +180,12 @@ describe("bookmark import detection", () => {
   });
 
   it("ignores bookmarks created during import", async () => {
+    vi.useFakeTimers();
+    store.api_config = {
+      baseUrl: "https://api.test.com/v1",
+      apiKey: "test-key",
+      model: "gpt-4o-mini",
+    };
     const importBegan = chrome.bookmarks.onImportBegan as unknown as {
       callListeners: () => void;
     };
@@ -184,8 +202,6 @@ describe("bookmark import detection", () => {
       parentId: "1",
     } as chrome.bookmarks.BookmarkTreeNode);
 
-    expect(chrome.bookmarks.move).not.toHaveBeenCalled();
-
     importEnded.callListeners();
 
     await _handleBookmarkCreated("b7", {
@@ -195,8 +211,17 @@ describe("bookmark import detection", () => {
       parentId: "1",
     } as chrome.bookmarks.BookmarkTreeNode);
 
-    expect(chrome.bookmarks.move).toHaveBeenCalledWith("b7", {
-      parentId: "10",
-    });
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_INITIAL_MS);
+
+    const { enqueueTask } = await import("../task-queue");
+    expect(enqueueTask).toHaveBeenCalledTimes(1);
+    expect(enqueueTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookmarkId: "b7",
+        title: "Normal Page",
+        url: "https://normal.com",
+        status: "pending",
+      }),
+    );
   });
 });
