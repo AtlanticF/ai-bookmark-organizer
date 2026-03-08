@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "tag": "git tag v$(node scripts/get-version.cjs)",
+    "tag:push": "pnpm tag && git push origin --tags"
   },
   "keywords": [
     "chrome-extension",
