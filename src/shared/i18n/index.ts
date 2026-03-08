@@ -11,7 +11,7 @@ const resources = {
 
 const chromeStorageDetector = {
   name: "chromeStorage",
-  lookup(options: Record<string, unknown>) {
+  lookup(_options: Record<string, unknown>) {
     return undefined as string | undefined;
   },
   cacheUserLanguage() {},
@@ -37,8 +37,10 @@ i18n
 
 if (typeof chrome !== "undefined" && chrome.storage?.local) {
   chrome.storage.local.get("language").then((result) => {
-    if (result.language && result.language !== i18n.language) {
-      i18n.changeLanguage(result.language);
+    const lang =
+      typeof result?.language === "string" ? result.language : undefined;
+    if (lang && lang !== i18n.language) {
+      i18n.changeLanguage(lang);
     }
   }).catch(() => {});
 }

@@ -188,12 +188,18 @@ function createButton() {
 
   chrome.storage.local
     .get("task_queue")
-    .then((result) => updateRing(result.task_queue ?? []))
+    .then((result) => {
+      const queue = Array.isArray(result?.task_queue) ? result.task_queue : [];
+      updateRing(queue as Array<{ status: string }>);
+    })
     .catch(() => {});
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.task_queue) return;
-    updateRing(changes.task_queue.newValue ?? []);
+    const queue = Array.isArray(changes.task_queue.newValue)
+      ? changes.task_queue.newValue
+      : [];
+    updateRing(queue as Array<{ status: string }>);
   });
 
   btn.addEventListener("click", () => {
